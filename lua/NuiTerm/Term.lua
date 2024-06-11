@@ -1,11 +1,29 @@
 --> NuiTerm/Term.lua
 --
 local Setup = require("NuiTerm.setup")
-local Debug = require("NuiTerm.Debug").Debug
+local Debug = require("NuiTerm.Debug")
 
-local NSID = Setup.NSID
+local function log(msg, src)
+  local source = "TermWindow"
+  if src then
+    source = source .. ":" .. src
+  end
+  Debug.push_message(source, msg)
+end
 
+---@class TermWindow
+---@field bufnr       number|nil
+---@field winid       number|nil
+---@field termid      number|nil
+---@field name        string
+---@field autocmdid   number|nil
+---@field config      table
+---@field onHide      function|nil
+---@field showing     boolean
+---@field spawned     boolean
+---@field initialized boolean
 local TermWindow = {
+  ---@typw bufnr = number
   bufnr     = nil,
   winid     = nil,
   termid    = nil,
@@ -13,12 +31,15 @@ local TermWindow = {
   autocmdid = nil,
   config    = {},
   onHide    = nil,
+  showing   = false,
   spawned   = false,
+  initialized = false,
 }
+
 function TermWindow:IsBufValid()
-  local valid =  self.bufnr and vim.api.nvim_buf_is_valid(self.bufnr)
+  local valid = self.bufnr and vim.api.nvim_buf_is_valid(self.bufnr)
   if not valid then
-    Debug("TermWindow:IsBufValid: Bufnr was somehow deleted!")
+    log("Bufnr was somehow deleted!", "IsBufValid")
   end
   return valid
 end
@@ -29,17 +50,16 @@ end
 -- @param height number: The height of the terminal window
 -- @param col number: The X coordinate for the floating window
 -- @param row number: The Y coordinate for the floating window
-function TermWindow:Init(termid, config)
-  self.termid = termid
-  self.config = config
+function TermWindow:Init(termid, config, onLeave)
+  local obj = setmetatable({}, { __index = self})
+  obj.termid = termid
+  obj.config = config
   local bufnr = vim.api.nvim_create_buf(false, true)
   vim.bo[bufnr].bufhidden = "hide"
-  self.bufnr = bufnr
-  -- NSID = vim.api.nvim_buf_add_highlight(bufnr, NSID, "FloatBorder", self.config.col, 0, -1)
-  -- vim.api.nvim_set_hl_ns(NSID)
-  Debug("TermWIndow:Init: NSID " .. NSID)
-
-  return self
+  obj.bufnr = bufnr
+  obj.initialized = true
+  obj.spawned = false
+  return obj
 end
 
 function TermWindow:RecreateBuf()
@@ -52,18 +72,22 @@ function TermWindow:RecreateBuf()
 end
 
 function TermWindow:SpawnShell(onLeave)
+  -- print("TermWIndow:SpawnShell " .. self.termid)
+  -- print("BUFNR: " .. self.bufnr)
   if self.spawned then
-    Debug("TermWindow:SpawnShell: Already spawned")
+    log("Already spawned ID: " .. self.termid, "SpawnShell")
     return
   end
+  -- vim.cmd("terminal")
   vim.fn.termopen(vim.o.shell, {
+    bufnr = self.bufnr,
     on_exit = function()
+      log("ON_EXIT!", "SpawnShell")
       onLeave()
-    end
+    end,
   })
   self.spawned = true
 end
-
 
 -- Creats a new Floating window, with the specified window confiurations originally passed
 -- to this TermWindow instance wihtin Init
@@ -71,23 +95,21 @@ end
 function TermWindow:Show(onLeave)
   self:RecreateBuf()
   if not self.config then
-    Debug("TermWindow:Show(): Self.config is nil")
-    return
+    error("TermWindow:Show(): Self.config is nil", 2)
   end
-  Debug("TermWindow: Bufnr - " .. self.bufnr)
+  log("TermWindow: Bufnr - " .. self.bufnr, "Show")
   local winid = vim.api.nvim_open_win(self.bufnr, true, self.config)
   self.winid  = winid
   self.onHide = onLeave
 
-  self:SpawnShell()
+  self:SpawnShell(onLeave)
 
-  Debug("Adding KeyCommands")
   -- When the user moves the focus from the NuiTerm Window to another neovim window,
   -- we call this autocmd. Which in turn calls our 'onLeave' callback, i.e., MainWindow:Hide()
   self.autocmdid = vim.api.nvim_create_autocmd({"WinLeave"}, {
-    buffer   = self.bufnr,
+    buffer = self.bufnr,
     callback = function()
-      if winid and vim.api.nvim_win_is_valid(winid) then
+      if self.showing and winid and vim.api.nvim_win_is_valid(winid) then
         onLeave()
       end
     end
@@ -126,18 +148,26 @@ function TermWindow:Show(onLeave)
       silent  = true,
     }
   )
+  self.showing = true;
   return winid
 end
 
 function TermWindow:Hide()
-  if not self.winid then
-    Debug("TermWindow:Hide(): winid is nil, no Termianl to hide")
+  if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
+    log("winid is nil, no Termianl to hide", "Hide")
     return
   end
+
+  vim.api.nvim_del_autocmd(self.autocmdid)
+  vim.api.nvim_buf_del_keymap(self.bufnr, 't', '<Esc>')
+  vim.api.nvim_buf_del_keymap(self.bufnr, 'n', 'i')
+  vim.api.nvim_buf_del_keymap(self.bufnr, 'n', '<Esc>')
+
+  self.showing = false;
   vim.api.nvim_win_hide(self.winid)
   self.winid = nil
 end
 
 return {
-  TermWindow = TermWindow
+  TermWindow = TermWindow,
 }
