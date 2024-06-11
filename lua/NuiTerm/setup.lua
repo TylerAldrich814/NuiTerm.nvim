@@ -5,6 +5,8 @@ local M = {}
 
 M.NSID = vim.api.nvim_create_namespace("NuiTerm")
 
+--TODO: You need to figure out why you're getting an error if you don't include 
+--      ALL of the keyMaps within lazy setup of NuiTerm
 M.winConfig = {
   width    = vim.o.columns,
   height   = 20,
@@ -14,8 +16,9 @@ M.winConfig = {
 }
 M.keyMaps = {
   nuiterm_toggle = "<leader>tt",
-  next_term = "<C-l>",
-  prev_term = "<C-h>",
+  new_term       = "<leader>tn",
+  next_term      = "<leader>tl",
+  prev_term      = "<leader>tk",
 }
 
 function M.setup(opts)

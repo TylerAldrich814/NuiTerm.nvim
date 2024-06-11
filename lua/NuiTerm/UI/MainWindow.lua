@@ -8,13 +8,9 @@ local TermWindow = require("NuiTerm.Term").TermWindow
 -- local Term = require("NuiTerm.Term")
 local Debug = require("NuiTerm.Debug")
 
-local function log(msg, src)
-  local source = "MainWindow"
-  if src then
-    source = source .. ":" .. src
-  end
-  Debug.push_message(source, msg)
-end
+local log = Debug.LOG_FN("MainWindow", {
+  deactivate = true,
+})
 
 ---@class MainWindow
 ---@field nsid          integer|nil
@@ -48,7 +44,12 @@ function MainWindow:New(winConfig, tabBarConfig)
   local obj = setmetatable({}, { __index = self })
   obj.nsid = vim.api.nvim_create_namespace("NuiTerm")
   obj.winConfig = winConfig
-  obj.tabBar    = TabBar:New(tabBarConfig)
+  obj.tabBar    = TabBar:New(
+    tabBarConfig,
+    function(idx)
+      self:ShowTerminal(idx)
+    end
+  )
   return obj
 end
 
@@ -85,7 +86,6 @@ end
 function MainWindow:Show()
   log("Showing", "Show")
   self:ShowTerminal(self.currentTermID)
-  self.tabBar:Show()
   self:UpdateTabBar()
   self:TermMode()
   self.showing = true
@@ -161,7 +161,7 @@ function MainWindow:DebugBufs()
 end
 
 function MainWindow:NextTerm()
-  self:DebugBufs()
+  -- self:DebugBufs()
   if self.currentTermID then
     self.termWindows[self.currentTermID]:Hide()
   end
@@ -175,7 +175,7 @@ function MainWindow:PrevTerm()
   if self.currentTermID then
     self.termWindows[self.currentTermID]:Hide()
   end
-  self.currentTermID = (self.currentTermID - 1 + self.totalTerms) % self.totalTerms + 1
+  self.currentTermID = (self.currentTermID - 2 + self.totalTerms) % self.totalTerms + 1
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
   log("CurrentTermID: "..self.currentTermID, "PrevTerm")
@@ -195,8 +195,6 @@ function MainWindow:TermMode()
 end
 
 function MainWindow:NormMode()
-  local ns = vim.api.nvim_get_namespaces()["NuiTerm"]
-
   vim.api.nvim_win_set_hl_ns(self.winid, self.nsid)
   vim.api.nvim_set_hl(self.nsid, "FloatBorder", {
     blend = 00,
@@ -207,21 +205,15 @@ end
 
 function MainWindow:GetTabNames()
   local names = {}
-  -- for i = 1, self.totalTerms do
-  --   table.insert(names, "Term " .. i)
-  -- end
-  for _, i in pairs(self.termWindows) do
-    if not i.termid then
-      table.insert(names, "NO TERM")
-    else
-      table.insert(names, "Term " .. i.termid)
-    end
+  for i = 1, self.totalTerms do
+    table.insert(names, " Term " .. i .. " ")
   end
   return names
 end
+
 function MainWindow:UpdateTabBar()
-  self.tabBar:SetTabs(self:GetTabNames())
-  self.tabBar:HighlightActiveTab(self.currentTermID+1)
+  self.tabBar:SetTabs(self:GetTabNames(), self.currentTermID)
+  -- self.tabBar:HighlightActiveTab(self.currentTermID)
 end
 
 return {

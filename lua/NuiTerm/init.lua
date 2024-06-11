@@ -6,11 +6,6 @@ local NuiTerm       = require("NuiTerm.UI.MainWindow")
 local Debug         = require("NuiTerm.Debug")
 
 local M = {}
--- M.setup = setup.setup
-
--- M.MoveCursorDir = function(dir)
---   vim.cmd('wincmd ' .. dir)
--- end
 
 M.setup = function(opts)
   M.keyMaps = opts.user_keymaps
@@ -19,10 +14,9 @@ M.setup = function(opts)
   if not winConfig.relative then
     error("Relative is missing", 2)
   end
+
   local tabBarConfig = NuiTermUtils.TabBarConfig(opts.win_config)
-  if not tabBarConfig then
-    error("tabBarConfig is fucked", 2)
-  end
+
   M.MainWindow = NuiTerm.MainWindow:New(winConfig, tabBarConfig)
 
   vim.keymap.set(
@@ -37,10 +31,10 @@ M.setup = function(opts)
     }
   )
   vim.keymap.set(
-    {'n', 't'},
-    '<leader>tl',
+    'n',
+    M.keyMaps.new_term,
     function()
-      M.MainWindow:NextTerm()
+      M.MainWindow:NewTerm()
     end,
     {
       noremap = true,

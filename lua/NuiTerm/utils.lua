@@ -41,9 +41,9 @@ M.WindowConfig = function(config)
 end
 
 M.TabBarConfig = function(config)
-  local winWidth    = config.width or vim.o.columns
-  local winHeight   = config.height or 20
-  local position = config.position or "bottom"
+  local winWidth  = config.width or vim.o.columns
+  local winHeight = config.height or 20
+  local position  = config.position or "bottom"
 
   local tabRow = 0
   if position == "bottom" then
@@ -52,18 +52,25 @@ M.TabBarConfig = function(config)
     tabRow = 3
   end
 
-  print("TabBar width: " .. winWidth)
-
   return {
-    relative = "editor",
-    width     = winWidth,
-    height    = 1,
-    row       = tabRow,
-    col       = 0,
-    style     = "minimal",
-    border    = "none",
-    focusable = false,
+    MainBar = {
+      relative = "editor",
+      width     = winWidth,
+      height    = 1,
+      row       = tabRow,
+      col       = 0,
+      style     = "minimal",
+      border    = "none",
+      focusable = false,
+    },
+    Tab = {
+      col = 0,
+      row = tabRow,
+      width  = 10,
+      height = 1,
+    },
   }
 end
+
 
 return M

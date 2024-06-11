@@ -3,13 +3,9 @@
 local Setup = require("NuiTerm.setup")
 local Debug = require("NuiTerm.Debug")
 
-local function log(msg, src)
-  local source = "TermWindow"
-  if src then
-    source = source .. ":" .. src
-  end
-  Debug.push_message(source, msg)
-end
+local log = Debug.LOG_FN("TermWindow", {
+  deactivate = true,
+})
 
 ---@class TermWindow
 ---@field bufnr       number|nil
@@ -24,15 +20,15 @@ end
 ---@field initialized boolean
 local TermWindow = {
   ---@typw bufnr = number
-  bufnr     = nil,
-  winid     = nil,
-  termid    = nil,
-  name      = "Terminal",
-  autocmdid = nil,
-  config    = {},
-  onHide    = nil,
-  showing   = false,
-  spawned   = false,
+  bufnr       = nil,
+  winid       = nil,
+  termid      = nil,
+  name        = "Terminal",
+  autocmdid   = nil,
+  config      = {},
+  onHide      = nil,
+  showing     = false,
+  spawned     = false,
   initialized = false,
 }
 
@@ -51,7 +47,7 @@ end
 -- @param col number: The X coordinate for the floating window
 -- @param row number: The Y coordinate for the floating window
 function TermWindow:Init(termid, config, onLeave)
-  local obj = setmetatable({}, { __index = self})
+  local obj = setmetatable({}, { __index = self })
   obj.termid = termid
   obj.config = config
   local bufnr = vim.api.nvim_create_buf(false, true)
@@ -106,16 +102,17 @@ function TermWindow:Show(onLeave)
 
   -- When the user moves the focus from the NuiTerm Window to another neovim window,
   -- we call this autocmd. Which in turn calls our 'onLeave' callback, i.e., MainWindow:Hide()
-  self.autocmdid = vim.api.nvim_create_autocmd({"WinLeave"}, {
-    buffer = self.bufnr,
-    callback = function()
-      if self.showing and winid and vim.api.nvim_win_is_valid(winid) then
-        onLeave()
-      end
-    end
-  })
+  -- self.autocmdid = vim.api.nvim_create_autocmd({ "WinLeave" }, {
+  --   buffer = self.bufnr,
+  --   callback = function()
+  --     if self.showing and winid and vim.api.nvim_win_is_valid(winid) then
+  --       onLeave()
+  --     end
+  --   end
+  -- })
+  
   -- Mode Keymaps
-  --- If in 'terminal' mode, Hitting <Esc> will call MainWindow:NormMode -- Putting you into Normal Mode 
+  --- If in 'terminal' mode, Hitting <Esc> will call MainWindow:NormMode -- Putting you into Normal Mode
   vim.api.nvim_buf_set_keymap(
     self.bufnr,
     't',
@@ -148,6 +145,27 @@ function TermWindow:Show(onLeave)
       silent  = true,
     }
   )
+  vim.api.nvim_buf_set_keymap(
+    self.bufnr,
+    'n',
+    require('NuiTerm').keyMaps.next_term,
+    [[<cmd>lua require('NuiTerm').MainWindow:NextTerm()<CR>]],
+    {
+      noremap = true,
+      silent  = true,
+    }
+  )
+  vim.api.nvim_buf_set_keymap(
+    self.bufnr,
+    'n',
+    -- require('NuiTerm').keyMaps.next_term,
+    "<leader>th",
+    [[<cmd>lua require('NuiTerm').MainWindow:PrevTerm()<CR>]],
+    {
+      noremap = true,
+      silent  = true,
+    }
+  )
   self.showing = true;
   return winid
 end
@@ -158,7 +176,7 @@ function TermWindow:Hide()
     return
   end
 
-  vim.api.nvim_del_autocmd(self.autocmdid)
+  -- vim.api.nvim_del_autocmd(self.autocmdid)
   vim.api.nvim_buf_del_keymap(self.bufnr, 't', '<Esc>')
   vim.api.nvim_buf_del_keymap(self.bufnr, 'n', 'i')
   vim.api.nvim_buf_del_keymap(self.bufnr, 'n', '<Esc>')
