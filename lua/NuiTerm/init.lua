@@ -2,10 +2,10 @@
 --
 local NuiTermSetup  = require("NuiTerm.setup")
 local NuiTermUtils  = require("NuiTerm.utils")
-local NuiTerm       = require("NuiTerm.UI.MainWindow")
-local Debug         = require("NuiTerm.Debug")
+local NuiTerm       = require("NuiTerm.UI.MainWindow") local Debug         = require("NuiTerm.Debug")
 
 local M = {}
+M.keyMaps = NuiTermUtils.keyMaps
 
 M.setup = function(opts)
   M.keyMaps = opts.user_keymaps
@@ -43,6 +43,13 @@ M.setup = function(opts)
   )
 end
 
+M.Expand = function()
+  M.MainWindow:Resize(NuiTermSetup.keyMaps.term_resize.expand.amt)
+end
+M.Shrink = function()
+  M.MainWindow:Resize(NuiTermSetup.keyMaps.term_resize.shrink.amt)
+end
+
 for _, cmd in pairs({
   {
     cmd = "DebugShow",
@@ -52,6 +59,11 @@ for _, cmd in pairs({
   {
     cmd = "DebugHide",
     fn = function() Debug.hide_debug_window() end,
+    opts = { nargs = 0 }
+  },
+  {
+    cmd = "DebugToggle",
+    fn = function() Debug.ToggleDebug() end,
     opts = { nargs = 0 }
   },
   {
@@ -68,6 +80,11 @@ for _, cmd in pairs({
     cmd = "HideWindow",
     fn  = function() M.MainWindow:Hide() end,
     opts = { nargs = 0 }
+  },
+  {
+    cmd = "Resize",
+    fn = function(opts) M.MainWindow:Resize(opts.args) end,
+    opts = { nargs = 1 },
   },
   {
     cmd = "NewTerm",

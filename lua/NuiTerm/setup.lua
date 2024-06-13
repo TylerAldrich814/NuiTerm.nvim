@@ -17,8 +17,13 @@ M.winConfig = {
 M.keyMaps = {
   nuiterm_toggle = "<leader>tt",
   new_term       = "<leader>tn",
-  next_term      = "<leader>tl",
-  prev_term      = "<leader>tk",
+  next_term      = "<leader>tk",
+  prev_term      = "<leader>tj",
+  close_term     = "<leader>tx",
+  term_resize    = {
+    expand = { cmd = "<C-p>", amt =  1 },
+    shrink = { cmd = "<C-o>", amt = -1 }
+  },
 }
 
 function M.setup(opts)

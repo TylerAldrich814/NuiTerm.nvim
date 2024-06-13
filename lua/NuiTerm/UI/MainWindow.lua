@@ -9,7 +9,7 @@ local TermWindow = require("NuiTerm.Term").TermWindow
 local Debug = require("NuiTerm.Debug")
 
 local log = Debug.LOG_FN("MainWindow", {
-  deactivate = true,
+  deactivate = false,
 })
 
 ---@class MainWindow
@@ -22,6 +22,7 @@ local log = Debug.LOG_FN("MainWindow", {
 ---@field termWindows   TermWindow[]
 ---@field winConfig     table
 ---@field tabBar        TabBar
+---@field resizeCmdID   number|nil
 local MainWindow = {
   nsid           = nil,
   winid          = nil,
@@ -31,7 +32,9 @@ local MainWindow = {
   currentTermID  = nil,
   termWindows    = {},
   winConfig      = {},
-  tabBar         = TabBar
+  tabBar         = TabBar,
+  resizeCmdID    = nil,
+  resizing       = false,
 }
 
 function MainWindow:New(winConfig, tabBarConfig)
@@ -54,7 +57,6 @@ function MainWindow:New(winConfig, tabBarConfig)
 end
 
 function MainWindow:CreateNewTerm()
-  log("Createing New Terminal Window", "CreateNewTerm")
   local newTermID = self.totalTerms + 1
   local newTerm = TermWindow:Init(newTermID, self.winConfig)
   self.termWindows[newTermID] = newTerm
@@ -84,26 +86,33 @@ function MainWindow:ShowTerminal(id)
 end
 
 function MainWindow:Show()
-  log("Showing", "Show")
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  self:TermMode()
+  if not self.resizing then
+    self:TermMode()
+  end
   self.showing = true
+  self:OnResize()
+  self:CtrlMode()
+end
+
+function MainWindow:CtrlMode()
+
 end
 
 function MainWindow:Hide()
-  log("Hiding NuiTerm", "Hide")
   if not self.showing then return end
 
   local currentTerm = self.termWindows[self.currentTermID]
   if not currentTerm then
-    log("Terminal to Hide", "Hide")
     return
   end
   currentTerm:Hide()
   self.tabBar:Hide()
   self.winid   = nil
   self.showing = false
+
+  vim.api.nvim_del_autocmd(self.resizeCmdID)
 end
 
 function MainWindow:Toggle()
@@ -123,26 +132,38 @@ function MainWindow:NewTerm()
   self:UpdateTabBar()
 end
 
+--TODO: when deleting a term window, term_id+1's shell instance is cloned from term_id-1 ...?
 function MainWindow:DeleteTerm(term_id)
   if not term_id then
     term_id = self.currentTermID
   end
-  if self.termWindows[term_id] then
-    self.termWindows[term_id]:Hide()
-    self.termWindows[term_id] = nil
-    if term_id < self.totalTerms then
-      -- Go through id+1 terminal instances, lower their term_id's by 1
-      for i = term_id+1, self.totalTerms do
-        ---@class TermWindow
-        local term = self.termWindows[i]
-        if term then
-          term.termid = term.termid-1
-        end
-      end
-    end
-    self:UpdateTabBar()
+
+  --- Check within bounds of valid terms
+  if term_id < 1 or term_id > self.totalTerms then
+    return
   end
+
+  self:Hide()
+  table.remove(self.termWindows, term_id)
+  -- self.termWindows[term_id] = nil
+  -- self:Hide()
+  log("Deleted TermID: " .. term_id)
+  for i = term_id+1, self.totalTerms do
+    -- log(" < Term ID: " .. self.termWindows[i].termid)
+    self.termWindows[i] = self.termWindows[i-1]
+    -- log(".. is now TermID: " .. self.termWindows[i].termid)
+  end
+  self.totalTerms = self.totalTerms-1
+
+  log("New Term IDs")
+  for _, term in ipairs(self.termWindows) do
+    log("Name: "..term.name.. " ID: " .. term.termid)
+  end
+
+  --> Update Display
+  self:Show()
 end
+
 
 function MainWindow:ToTerm(term_id)
   if term_id > self.totalTerms or term_id < 0 then
@@ -154,21 +175,13 @@ function MainWindow:ToTerm(term_id)
   self:UpdateTabBar()
 end
 
-function MainWindow:DebugBufs()
-  for _, t in pairs(self.termWindows) do
-    log("TermID: " .. t.termid .. " - Bufnr: " .. t.bufnr)
-  end
-end
-
 function MainWindow:NextTerm()
-  -- self:DebugBufs()
   if self.currentTermID then
     self.termWindows[self.currentTermID]:Hide()
   end
   self.currentTermID = (self.currentTermID % self.totalTerms) + 1
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  log("CurrentTermID: "..self.currentTermID, "NextTerm")
 end
 
 function MainWindow:PrevTerm()
@@ -178,12 +191,12 @@ function MainWindow:PrevTerm()
   self.currentTermID = (self.currentTermID - 2 + self.totalTerms) % self.totalTerms + 1
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  log("CurrentTermID: "..self.currentTermID, "PrevTerm")
 end
 
+
 function MainWindow:TermMode()
+  self.resize = false
   if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
-    log("self.winid is NIL", "TermMode")
     return
   end
   vim.api.nvim_win_set_hl_ns(self.winid, self.nsid)
@@ -205,15 +218,57 @@ end
 
 function MainWindow:GetTabNames()
   local names = {}
+  --TODO: Dynamic Tab sizing with padding. After adding Tab Naming Functionality
   for i = 1, self.totalTerms do
-    table.insert(names, " Term " .. i .. " ")
+    table.insert(names, "    Terminal " .. i .. "    ")
   end
   return names
 end
 
 function MainWindow:UpdateTabBar()
   self.tabBar:SetTabs(self:GetTabNames(), self.currentTermID)
-  -- self.tabBar:HighlightActiveTab(self.currentTermID)
+end
+
+--- TuiTerm Resizing ---
+---                  ---
+---@param arg number|string
+function MainWindow:Resize(arg)
+  self.resizing = true
+  local num = tonumber(arg)
+  if not num then
+    log("Arg passed is not a number: " .. arg, "Resize")
+    return
+  else
+    log("TONumber: " .. num)
+  end
+  self.winConfig.height = self.winConfig.height + arg
+  self.winConfig.row = vim.o.lines - self.winConfig.height - 4
+
+  for _, term in pairs(self.termWindows) do
+    term:UpdateConfig(self.winConfig)
+  end
+  self:Hide()
+  self.tabBar:UpdatePos(arg)
+  self:Show()
+end
+
+function MainWindow:OnResize()
+  self.resizeCmdID = vim.api.nvim_create_autocmd("VimResized", {
+    callback = function()
+      vim.defer_fn(function()
+        self:NormMode()
+        local width, _ = Utils.GetTermSize()
+        self.winConfig.width = width
+        self.winConfig.height = 20
+
+        for _, term in pairs(self.termWindows) do
+          term:UpdateConfig(self.winConfig)
+        end
+        self:Hide()
+        self:Show()
+      end, 400)
+    end
+  })
 end
 
 return {

@@ -1,9 +1,12 @@
 --> NuiTerm/TabBar.lua
 --
 local Debug = require("NuiTerm.Debug")
+local Utils = require("NuiTerm.utils")
+local fn, api, map = vim.fn, vim.api, vim.keymap.set
+local AUGROUP = api.nvim_create_augroup("NuiTermTabHover", { clear=true })
 
 local log = Debug.LOG_FN("TabBar", {
-  deactivate = false,
+  deactivate = true,
 })
 
 vim.api.nvim_set_hl(0, 'TabLine', { fg = '#ffffff', bg = '#000000' }) -- Customize colors as needed
@@ -40,6 +43,7 @@ function Tab:New(
   local obj = setmetatable({}, {__index = self})
   obj.name = name
   obj.bufnr = vim.api.nvim_create_buf(false, true)
+  vim.bo[obj.bufnr].buftype = "nofile"
   vim.bo[obj.bufnr].bufhidden = "hide"
   obj.config = {
     relative  = "editor",
@@ -52,6 +56,7 @@ function Tab:New(
     width     = width,
     height    = height,
   }
+  Utils.PreventFileOpenInTerm(obj.bufnr)
   return obj
 end
 
@@ -62,6 +67,7 @@ function Tab:Display(onClick)
   end
 
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
+  vim.wo.winfixbuf = true -- Disables Files from loading in Term window!
 
   vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { self.name })
   -- vim.api.nvim_buf_add_highlight(self.bufnr, 0, group, 0, tabStart, tabEnd)
@@ -90,15 +96,14 @@ function Tab:Hide()
 end
 
 ------------------------ TabBar ------------------------ 
---------------------------------------------------------
+-------------------------------------------------------
+--TODO: Figure out how to gracfully close the TabBar when you quit NuiTerm via ':q'&':q!'..
 
 ---@class TabBar
 ---@field t Tab[]
 ---@field winid      number|nil
 ---@field bufnr      number|nil
----@field tabs       number[]
----@field tabWindows number[]
----@field tabCoords  table
+---@field tabs       Tab[]
 ---@field config     table
 ---@field tabConfig  table
 ---@field seperator  string
@@ -106,10 +111,7 @@ end
 local TabBar = {
   winid     = nil,
   bufnr     = nil,
-  t  = {},
   tabs      = {},
-  tabWindows = {},
-  tabCoords = {},
   config    = {},
   tabConfig = {},
   seperator = "▎",
@@ -138,8 +140,9 @@ function TabBar:SetTabs(termTabs, focusedIdx)
   local width  = self.tabConfig.width
   local height = self.tabConfig.height
 
+  log("Col: " .. self.tabConfig.col .. "Row: " .. self.tabConfig.row)
   for _, tabName in ipairs(termTabs) do
-    table.insert(self.t, Tab:New(
+    table.insert(self.tabs, Tab:New(
       tabName,
       col,
       row,
@@ -149,15 +152,13 @@ function TabBar:SetTabs(termTabs, focusedIdx)
     col = col + width + 1
   end
 
-  for i, tab in ipairs(self.t) do
+  for _, tab in ipairs(self.tabs) do
     tab:Display( self.onClick )
   end
 
-  for i, tab in ipairs(self.t) do
+  for i, tab in ipairs(self.tabs) do
     local group = "TabLine"
     if i == focusedIdx then group = "TabLineSel" end
-    log(string.format("idx: %d -- Tab %d -- group=%s",focusedIdx, i, group))
-
     tab:Highlight(group)
   end
 
@@ -173,36 +174,68 @@ function TabBar:SetTabs(termTabs, focusedIdx)
   )
 end
 
-
-function TabBar:HighlightActiveTab(index)
-  vim.api.nvim_buf_clear_namespace(self.bufnr, 0, 0, -1)
-  local line = 0
-  local col_start = 0
-
-  for i, tab in ipairs(self.tabs) do
-    local col_end = col_start + #tab
-    local group = "TabLine"
-    if i == index then group = "TabLineSel" end
-    log(string.format("Tab %d: col_start=%d, col_end=%d, group=%s", i, col_start, col_end, group), "HighlightActiveTab")
-
-    for _, buf in pairs(self.tabs) do
-      vim.api.nvim_buf_add_highlight(buf.bufnr, 0, group, line, col_start, col_end)
-    end
-    col_start = col_end + #self.seperator --3 -- " | ".len()
-  end
-end
+local delay    = 500
+local timer    = nil
+local prev_pos = nil
 
 function TabBar:Hide()
   if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
     log("self.winid is not valid")
     return
   end
-  for _, tab in ipairs(self.t) do
+  for _, tab in ipairs(self.tabs) do
     tab:Hide()
   end
   vim.api.nvim_win_hide(self.winid)
   self.winid = nil
-  self.t = {}
+  self.tabs = {}
+end
+
+local function onHover(position)
+  if vim.o.showtabline == 0 then return end
+  if position.screenrow == 1 then
+    api.nvim_exec_autocmds("User", {
+      pattern = "TabBarHoverOver",
+      data = { cursor_pos = position.screencol }
+    })
+  elseif prev_pos and prev_pos.screenrow == 1 and position.screenrow ~= 1 then
+    api.nvim_exec_autocmds("User", {
+      pattern = "TabBarHoverOut",
+      data = {}
+    })
+  end
+end
+
+
+function TabBar:setupOnHover()
+  map({"", "i"}, "<MouseMove>", function()
+    if timer then timer:close() end
+    timer = vim.defer_fn(function()
+      timer = nil
+      local ok, pos = pcall(fn.getmousepos)
+      if not ok then return end
+      onHover(pos)
+    end, delay)
+    return "<MouseMove>"
+  end, { expr = true })
+
+  api.nvim_create_autocmd("VimLeavePre", {
+    group = AUGROUP,
+    callback = function()
+      if timer then
+        timer:close()
+        timer = nil
+      end
+    end
+  })
+end
+
+function TabBar:UpdatePos(pos)
+  log("Pos " .. pos, "UpdatePos")
+  log("oRow: ".. self.tabConfig.row .. " oCol: " .. self.tabConfig.col)
+  self.config.row    = self.config.row - pos
+  self.tabConfig.row = self.tabConfig.row - pos
+  log(" Row: " .. self.tabConfig.row .. "  Col: ".. self.tabConfig.col, "UpdatePos")
 end
 
 return {

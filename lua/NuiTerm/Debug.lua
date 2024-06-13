@@ -22,10 +22,42 @@ local M = {}
 
 M.FirstInit = true;
 M.Messages = {}
+M.StayClosed = true;
 
+vim.keymap.set('n', '<leader>td', function() M.ToggleDebug() end, { noremap = true, silent = true})
+
+function M.ToggleDebug()
+  if M.StayClosed then
+    M.StayClosed = false
+    M.create_or_get_debug_window()
+  else
+    M.StayClosed = true
+    M.hide_debug_window()
+  end
+end
+
+local function OnResize()
+  M.onResizeID = vim.api.nvim_create_autocmd('VimResized', {
+    callback = function()
+      vim.defer_fn(function()
+        local width = vim.o.columns
+        if width <= 100 then
+          DebugConfig.width = 40
+        elseif DebugConfig ~= 100 then
+          DebugConfig.width = 100
+        end
+        DebugConfig.col = width - 100
+        M.create_or_get_debug_window()
+      end, 400)
+    end
+  })
+end
 
 -- Create or get the existing debug window
 function M.create_or_get_debug_window()
+  if M.StayClosed then
+    return
+  end
   if debug_winid and vim.api.nvim_win_is_valid(debug_winid) then
     return debug_winid, debug_bufnr
   end
@@ -46,12 +78,15 @@ function M.create_or_get_debug_window()
     vim.api.nvim_buf_set_lines(debug_bufnr, -1, -1, false, M.Messages)
   end
 
+  OnResize()
+
   return debug_winid, debug_bufnr
 end
 
 function M.hide_debug_window()
   if debug_winid and vim.api.nvim_win_is_valid(debug_winid) then
     vim.api.nvim_win_hide(debug_winid)
+    vim.api.nvim_del_autocmd(M.onResizeID)
     debug_winid = nil
   end
 end

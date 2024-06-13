@@ -1,7 +1,11 @@
 --> NuiTerm/Term.lua
 --
 local Setup = require("NuiTerm.setup")
+local Utils = require("NuiTerm.utils")
 local Debug = require("NuiTerm.Debug")
+local fn, api, map = vim.fn, vim.api, vim.keymap.set
+
+local AUGROUP = api.nvim_create_augroup("NuiTermHover", { clear = true })
 
 local log = Debug.LOG_FN("TermWindow", {
   deactivate = true,
@@ -30,10 +34,11 @@ local TermWindow = {
   showing     = false,
   spawned     = false,
   initialized = false,
+  originalMouse = "",
 }
 
 function TermWindow:IsBufValid()
-  local valid = self.bufnr and vim.api.nvim_buf_is_valid(self.bufnr)
+  local valid = self.bufnr and api.nvim_buf_is_valid(self.bufnr)
   if not valid then
     log("Bufnr was somehow deleted!", "IsBufValid")
   end
@@ -46,21 +51,37 @@ end
 -- @param height number: The height of the terminal window
 -- @param col number: The X coordinate for the floating window
 -- @param row number: The Y coordinate for the floating window
-function TermWindow:Init(termid, config, onLeave)
+function TermWindow:Init(termid, config)
   local obj = setmetatable({}, { __index = self })
   obj.termid = termid
   obj.config = config
   local bufnr = vim.api.nvim_create_buf(false, true)
-  vim.bo[bufnr].bufhidden = "hide"
+  vim.bo[bufnr].bufhidden  = "hide"
+  vim.bo[bufnr].buftype    = "acwrite"
+  vim.bo[bufnr].modifiable = false
+  obj.originalMouse = vim.o.mouse
   obj.bufnr = bufnr
   obj.initialized = true
   obj.spawned = false
+  Utils.PreventFileOpenInTerm(obj.bufnr)
   return obj
+end
+
+function TermWindow:OnHoverOver(current)
+  if current.screenrow >= self.config.row
+    and current.screenrow <= self.config.row + self.config.height
+  then
+    api.nvim_exec_autocmds("User", { pattern = "NuiTermHoverOver" })
+    log("Hover Pos: x: " .. current.screencol .. " y: " .. current.screenrow)
+  else
+    api.nvim_exec_autocmds("User", { pattern = "NuiTermHoverOut" })
+    log("NotHovering Over NuiTerm")
+  end
 end
 
 function TermWindow:RecreateBuf()
   if not self:IsBufValid() then
-    local bufnr = vim.api.nvim_create_buf(false, true)
+    local bufnr = api.nvim_create_buf(false, true)
     vim.bo[bufnr].bufhidden = 'wipe'
     self.bufnr = bufnr
     self.spawned = false
@@ -93,8 +114,7 @@ function TermWindow:Show(onLeave)
   if not self.config then
     error("TermWindow:Show(): Self.config is nil", 2)
   end
-  log("TermWindow: Bufnr - " .. self.bufnr, "Show")
-  local winid = vim.api.nvim_open_win(self.bufnr, true, self.config)
+  local winid = api.nvim_open_win(self.bufnr, true, self.config)
   self.winid  = winid
   self.onHide = onLeave
 
@@ -102,18 +122,22 @@ function TermWindow:Show(onLeave)
 
   -- When the user moves the focus from the NuiTerm Window to another neovim window,
   -- we call this autocmd. Which in turn calls our 'onLeave' callback, i.e., MainWindow:Hide()
-  -- self.autocmdid = vim.api.nvim_create_autocmd({ "WinLeave" }, {
+  --TODO: We need to somehow detect if the focus left both the Term window AND the tabs window(s)
+  --      This might require returning a paramter to 'onLeave' Telling MainWindow:Hide() which function
+  --      called it( since we have a handful of functions that call Hide) That way if we tell onLeave that
+  --      this AutoCMD is calling it, we can then detect if our focus is on the tabbar or not.
+  -- self.autocmdid = api.nvim_create_autocmd({ "WinLeave" }, {
   --   buffer = self.bufnr,
   --   callback = function()
-  --     if self.showing and winid and vim.api.nvim_win_is_valid(winid) then
+  --     if self.showing and winid and api.nvim_win_is_valid(winid) then
   --       onLeave()
   --     end
   --   end
   -- })
-  
+
   -- Mode Keymaps
   --- If in 'terminal' mode, Hitting <Esc> will call MainWindow:NormMode -- Putting you into Normal Mode
-  vim.api.nvim_buf_set_keymap(
+  api.nvim_buf_set_keymap(
     self.bufnr,
     't',
     '<Esc>',
@@ -123,29 +147,48 @@ function TermWindow:Show(onLeave)
       silent  = true,
     }
   )
-  -- If in 'Normal' mode, Hitting 'i' will call MainWindow:TermMode -- Putting you into TerminalMode
-  vim.api.nvim_buf_set_keymap(
+
+  api.nvim_buf_set_keymap(
     self.bufnr,
-    'n',
-    'i',
-    [[<cmd>lua require('NuiTerm').MainWindow:TermMode()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    "i",
+    "<LeftDrag>",
+    "<nop>",
+    { noremap = true, silent = true }
   )
+  api.nvim_buf_set_keymap(
+    self.bufnr,
+    "i",
+    "<LeftRelease>",
+    "<nop>",
+    { noremap = true, silent = true }
+  )
+
+  local insert_commands = { "i", "<S-i>", "a", "<S-a>" }
+  -- If in 'Normal' mode, Hitting 'i' will call MainWindow:TermMode -- Putting you into TerminalMode
+  for _, cmd in ipairs(insert_commands) do
+    api.nvim_buf_set_keymap(
+      self.bufnr,
+      'n',
+      cmd,
+      [[<cmd>lua require('NuiTerm').MainWindow:TermMode()<CR>]],
+      {
+        noremap = true,
+        silent  = true,
+      }
+    )
+  end
   -- If in 'Normal' mode, Hitting <Esc> will call MainWindow:Hide() -- Hiding the NuiTerm Window
-  vim.api.nvim_buf_set_keymap(
+  api.nvim_buf_set_keymap(
     self.bufnr,
     'n',
-    '<Esc>',
+    "<Esc>",
     [[<cmd>lua require('NuiTerm').MainWindow:Hide()<CR>]],
     {
       noremap = true,
       silent  = true,
     }
   )
-  vim.api.nvim_buf_set_keymap(
+  api.nvim_buf_set_keymap(
     self.bufnr,
     'n',
     require('NuiTerm').keyMaps.next_term,
@@ -155,36 +198,84 @@ function TermWindow:Show(onLeave)
       silent  = true,
     }
   )
-  vim.api.nvim_buf_set_keymap(
+  api.nvim_buf_set_keymap(
     self.bufnr,
     'n',
-    -- require('NuiTerm').keyMaps.next_term,
-    "<leader>th",
+    require('NuiTerm').keyMaps.prev_term,
     [[<cmd>lua require('NuiTerm').MainWindow:PrevTerm()<CR>]],
     {
       noremap = true,
       silent  = true,
     }
   )
+  api.nvim_buf_set_keymap(
+    self.bufnr,
+    'n',
+    require('NuiTerm').keyMaps.close_term,
+    [[<cmd>lua require('NuiTerm').MainWindow:DeleteTerm()<CR>]],
+    {
+      noremap = true,
+      silent  = true,
+    }
+  )
+
+  local resizeCmd = { 'n', 'i' }
+  for _, cmd in pairs(resizeCmd) do
+    api.nvim_buf_set_keymap(
+      self.bufnr,
+      'n',
+      require("NuiTerm").keyMaps.term_resize.expand.cmd,
+      -- [[<cmd>lua require('NuiTerm').MainWindow:Resize(("NuiTerm").KeyMaps.term_resize.expand.amt)<CR>]],
+      [[<cmd>lua require('NuiTerm').Expand()<CR>]],
+      {
+        noremap = true,
+        silent  = true,
+      }
+    )
+    api.nvim_buf_set_keymap(
+      self.bufnr,
+      'n',
+      require("NuiTerm").keyMaps.term_resize.shrink.cmd,
+      -- [[<cmd>lua require('NuiTerm').MainWindow:Resize(("NuiTerm").KeyMaps.term_resize.shrink.amt)<CR>]],
+      [[<cmd>lua require('NuiTerm').Shrink()<CR>]],
+      {
+        noremap = true,
+        silent  = true,
+      }
+    )
+  end
   self.showing = true;
   return winid
 end
 
 function TermWindow:Hide()
-  if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
+  if not self.winid or not api.nvim_win_is_valid(self.winid) then
     log("winid is nil, no Termianl to hide", "Hide")
     return
   end
 
-  -- vim.api.nvim_del_autocmd(self.autocmdid)
-  vim.api.nvim_buf_del_keymap(self.bufnr, 't', '<Esc>')
-  vim.api.nvim_buf_del_keymap(self.bufnr, 'n', 'i')
-  vim.api.nvim_buf_del_keymap(self.bufnr, 'n', '<Esc>')
+  -- api.nvim_del_autocmd(self.autocmdid)
+  api.nvim_buf_del_keymap(self.bufnr, 't', '<Esc>')
+  api.nvim_buf_del_keymap(self.bufnr, 'n', 'i')
+  api.nvim_buf_del_keymap(self.bufnr, 'n', '<Esc>')
 
   self.showing = false;
-  vim.api.nvim_win_hide(self.winid)
+  api.nvim_win_hide(self.winid)
   self.winid = nil
 end
+
+function TermWindow:Delete()
+  self:Hide()
+  self.bufnr = nil
+  self.termid = nil
+end
+
+---@param config table
+function TermWindow:UpdateConfig(config)
+  self.config = config
+end
+
+
 
 return {
   TermWindow = TermWindow,
