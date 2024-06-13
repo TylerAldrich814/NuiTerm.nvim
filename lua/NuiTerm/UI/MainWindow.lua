@@ -4,7 +4,7 @@ local TabBar = require("NuiTerm.UI.TabBar").TabBar
 
 local Utils = require("NuiTerm.utils")
 -- local TermCreate = require("NuiTerm.Term").TermCreate
-local TermWindow = require("NuiTerm.Term").TermWindow
+local TermWindow = require("NuiTerm.UI.Term").TermWindow
 -- local Term = require("NuiTerm.Term")
 local Debug = require("NuiTerm.Debug")
 
@@ -34,7 +34,7 @@ local MainWindow = {
   winConfig      = {},
   tabBar         = TabBar,
   resizeCmdID    = nil,
-  resizing       = false,
+  stateChanging  = false,
 }
 
 function MainWindow:New(winConfig, tabBarConfig)
@@ -88,7 +88,7 @@ end
 function MainWindow:Show()
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  if not self.resizing then
+  if not self.stateChanging then
     self:TermMode()
   end
   self.showing = true
@@ -134,39 +134,51 @@ end
 
 --TODO: when deleting a term window, term_id+1's shell instance is cloned from term_id-1 ...?
 function MainWindow:DeleteTerm(term_id)
-  if not term_id then
-    term_id = self.currentTermID
-  end
-
-  --- Check within bounds of valid terms
-  if term_id < 1 or term_id > self.totalTerms then
+  if not term_id then term_id = self.currentTermID end
+  self:Hide()
+  if self.totalTerms == 1 then
+    self.termWindows   = {}
+    self.totalTerms    = 0
+    self.currentTermID = nil
+    self.initialized   = false
     return
   end
+  self.stateChanging = true
 
-  self:Hide()
-  table.remove(self.termWindows, term_id)
-  -- self.termWindows[term_id] = nil
-  -- self:Hide()
-  log("Deleted TermID: " .. term_id)
-  for i = term_id+1, self.totalTerms do
-    -- log(" < Term ID: " .. self.termWindows[i].termid)
-    self.termWindows[i] = self.termWindows[i-1]
-    -- log(".. is now TermID: " .. self.termWindows[i].termid)
+  local terms = self.termWindows
+  local left,right = {},{}
+
+  for i = 1, self.totalTerms do
+    if i < term_id then
+      log(" --> i("..i..") < term_id("..term_id..")")
+      table.insert(left, terms[i])
+    elseif i > term_id then
+      log(" --> i("..i..") > term_id("..term_id..")")
+      table.insert(right, terms[i])
+    end
   end
+
+  self.termWindows = {}
+  for _, t in ipairs(left) do
+    log(" -->  LEFT: Inserting ID: " .. t.termid)
+    table.insert(self.termWindows, t)
+  end
+  for _, t in ipairs(right) do
+    log(" --> RIGHT: Inserting ID: " .. t.termid)
+    table.insert(self.termWindows, t)
+  end
+  if term_id == self.totalTerms then
+    self.currentTermID = self.currentTermID-1
+  end
+
   self.totalTerms = self.totalTerms-1
-
-  log("New Term IDs")
-  for _, term in ipairs(self.termWindows) do
-    log("Name: "..term.name.. " ID: " .. term.termid)
-  end
-
-  --> Update Display
   self:Show()
+  self.stateChanging = false
 end
 
 
 function MainWindow:ToTerm(term_id)
-  if term_id > self.totalTerms or term_id < 0 then
+  if term_id > self.totalTerms or term_id < 1 then
     return
   end
   self.termWindows[self.currentTermID]:Hide()
@@ -233,7 +245,7 @@ end
 ---                  ---
 ---@param arg number|string
 function MainWindow:Resize(arg)
-  self.resizing = true
+  self.stateChanging = true
   local num = tonumber(arg)
   if not num then
     log("Arg passed is not a number: " .. arg, "Resize")
@@ -250,6 +262,7 @@ function MainWindow:Resize(arg)
   self:Hide()
   self.tabBar:UpdatePos(arg)
   self:Show()
+  self.stateChanging = false
 end
 
 function MainWindow:OnResize()

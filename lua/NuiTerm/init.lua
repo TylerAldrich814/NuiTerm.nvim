@@ -2,7 +2,8 @@
 --
 local NuiTermSetup  = require("NuiTerm.setup")
 local NuiTermUtils  = require("NuiTerm.utils")
-local NuiTerm       = require("NuiTerm.UI.MainWindow") local Debug         = require("NuiTerm.Debug")
+local NuiTerm       = require("NuiTerm.UI.MainWindow")
+local Debug         = require("NuiTerm.Debug")
 
 local M = {}
 M.keyMaps = NuiTermUtils.keyMaps

@@ -223,9 +223,8 @@ function TermWindow:Show(onLeave)
   for _, cmd in pairs(resizeCmd) do
     api.nvim_buf_set_keymap(
       self.bufnr,
-      'n',
+      cmd,
       require("NuiTerm").keyMaps.term_resize.expand.cmd,
-      -- [[<cmd>lua require('NuiTerm').MainWindow:Resize(("NuiTerm").KeyMaps.term_resize.expand.amt)<CR>]],
       [[<cmd>lua require('NuiTerm').Expand()<CR>]],
       {
         noremap = true,
@@ -234,9 +233,8 @@ function TermWindow:Show(onLeave)
     )
     api.nvim_buf_set_keymap(
       self.bufnr,
-      'n',
+      cmd,
       require("NuiTerm").keyMaps.term_resize.shrink.cmd,
-      -- [[<cmd>lua require('NuiTerm').MainWindow:Resize(("NuiTerm").KeyMaps.term_resize.shrink.amt)<CR>]],
       [[<cmd>lua require('NuiTerm').Shrink()<CR>]],
       {
         noremap = true,
@@ -250,7 +248,6 @@ end
 
 function TermWindow:Hide()
   if not self.winid or not api.nvim_win_is_valid(self.winid) then
-    log("winid is nil, no Termianl to hide", "Hide")
     return
   end
 
