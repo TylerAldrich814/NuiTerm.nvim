@@ -9,7 +9,7 @@ local TermWindow = require("NuiTerm.UI.Term").TermWindow
 local Debug = require("NuiTerm.Debug")
 
 local log = Debug.LOG_FN("MainWindow", {
-  deactivate = false,
+  deactivate = true,
 })
 
 ---@class MainWindow
@@ -150,21 +150,17 @@ function MainWindow:DeleteTerm(term_id)
 
   for i = 1, self.totalTerms do
     if i < term_id then
-      log(" --> i("..i..") < term_id("..term_id..")")
       table.insert(left, terms[i])
     elseif i > term_id then
-      log(" --> i("..i..") > term_id("..term_id..")")
       table.insert(right, terms[i])
     end
   end
 
   self.termWindows = {}
   for _, t in ipairs(left) do
-    log(" -->  LEFT: Inserting ID: " .. t.termid)
     table.insert(self.termWindows, t)
   end
   for _, t in ipairs(right) do
-    log(" --> RIGHT: Inserting ID: " .. t.termid)
     table.insert(self.termWindows, t)
   end
   if term_id == self.totalTerms then
@@ -175,7 +171,6 @@ function MainWindow:DeleteTerm(term_id)
   self:Show()
   self.stateChanging = false
 end
-
 
 function MainWindow:ToTerm(term_id)
   if term_id > self.totalTerms or term_id < 1 then

@@ -1,22 +1,21 @@
 --> NuiTerm/init.lua
 --
 local NuiTermSetup  = require("NuiTerm.setup")
-local NuiTermUtils  = require("NuiTerm.utils")
 local NuiTerm       = require("NuiTerm.UI.MainWindow")
 local Debug         = require("NuiTerm.Debug")
 
 local M = {}
-M.keyMaps = NuiTermUtils.keyMaps
+M.keyMaps = NuiTermSetup.keyMaps
 
 M.setup = function(opts)
   M.keyMaps = opts.user_keymaps
   NuiTermSetup.setup(opts)
-  local winConfig = NuiTermUtils.WindowConfig(opts.win_config)
+  local winConfig = NuiTermSetup.WindowConfig(opts.win_config)
   if not winConfig.relative then
     error("Relative is missing", 2)
   end
 
-  local tabBarConfig = NuiTermUtils.TabBarConfig(opts.win_config)
+  local tabBarConfig = NuiTermSetup.TabBarConfig(opts.win_config)
 
   M.MainWindow = NuiTerm.MainWindow:New(winConfig, tabBarConfig)
 
