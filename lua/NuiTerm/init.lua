@@ -17,7 +17,7 @@ M.setup = function(opts)
 
   local tabBarConfig = NuiTermSetup.TabBarConfig(opts.win_config)
 
-  M.MainWindow = NuiTerm.MainWindow:New(winConfig, tabBarConfig)
+  M.MainWindow = NuiTerm:New(winConfig, tabBarConfig)
 
   vim.keymap.set(
     'n',

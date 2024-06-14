@@ -2,7 +2,6 @@
 --
 
 local M = {}
-local Debug = require("NuiTerm.Debug").Debug
 
 M.OriginalWidthSetting = nil
 M.GetTermSize = function()

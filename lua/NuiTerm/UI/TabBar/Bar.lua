@@ -1,100 +1,15 @@
---> NuiTerm/TabBar.lua
+--> NuiTerm/TabBar/Bar.lua
 --
-local Debug = require("NuiTerm.Debug")
-local Utils = require("NuiTerm.utils")
+local Tab   = require("NuiTerm.UI.TabBar.Tab")
 local fn, api, map = vim.fn, vim.api, vim.keymap.set
 local AUGROUP = api.nvim_create_augroup("NuiTermTabHover", { clear=true })
 
-local log = Debug.LOG_FN("TabBar", {
-  deactivate = true,
+local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
+  deactivate = false,
 })
 
 vim.api.nvim_set_hl(0, 'TabLine', { fg = '#ffffff', bg = '#000000' }) -- Customize colors as needed
 vim.api.nvim_set_hl(0, 'TabLineSel', { fg = '#000000', bg = '#ffffff' }) -- Customize colors as needed
-
-------------------------- Tab --------------------------
---------------------------------------------------------
----@class Tab
----@field bufnr  number|nil
----@field winid  number|nil
----@field coord  table
----@field name   string
----@field config table
-local Tab = {
-  bufnr  = nil,
-  winid  = nil,
-  coord  = {},
-  name   = "",
-  config = {},
-}
-
----@param name     string
----@param col      number
----@param row      number
----@param width    number
----@param height   number
-function Tab:New(
-  name,
-  col,
-  width,
-  height,
-  mainWinId
-)
-  local obj = setmetatable({}, {__index = self})
-  obj.name = name
-  obj.bufnr = vim.api.nvim_create_buf(false, true)
-  vim.bo[obj.bufnr].buftype = "nofile"
-  vim.bo[obj.bufnr].bufhidden = "hide"
-  obj.config = {
-    relative  = "win",
-    win       = mainWinId,
-    style     = "minimal",
-    border    = "none",
-    zindex    = 100,
-    focusable = false,
-    col       = col,
-    row       = -1,
-    width     = width-2, --TODO: Remove '-2' once you get dynamic Tab Width established!
-    height    = height,
-  }
-  Utils.PreventFileOpenInTerm(obj.bufnr)
-  return obj
-end
-
----@param onClick function
-function Tab:Display(onClick)
-  if not vim.api.nvim_buf_is_valid(self.bufnr) then
-    log("self.bufnr not a valid bufnr: "..self.bufnr)
-  end
-
-  self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
-  vim.wo.winfixbuf = true -- Disables Files from loading in Term window!
-
-  vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { self.name })
-  -- vim.api.nvim_buf_add_highlight(self.bufnr, 0, group, 0, tabStart, tabEnd)
-
-  -- RightMouse kepmapping
-  vim.api.nvim_buf_set_keymap(self.bufnr, 'n', '<RightMouse>', '', {
-    callback = function()
-      log("Clicked on \"" .. self.name .. "\"")
-      onClick()
-    end,
-    noremap = true,
-    silent  = true,
-  })
-
-  log("Display Tab: Bufnr: ".. self.bufnr .. " Winid: "..self.winid)
-end
-function Tab:Highlight(group)
-  vim.api.nvim_buf_clear_namespace(self.bufnr, 0, 0, -1)
-  vim.api.nvim_buf_add_highlight(self.bufnr, 0, group, 0, 0, -1)
-end
-
-function Tab:Hide()
-  log("Hiding Tab Bufnr: ".. self.bufnr .. " Winid: " .. self.winid)
-  vim.api.nvim_win_hide(self.winid)
-  self.winid = nil
-end
 
 ------------------------ TabBar ------------------------ 
 -------------------------------------------------------
@@ -132,6 +47,9 @@ function TabBar:New(config, onClick)
   return obj
 end
 
+---@param termTabs   string[]
+---@param focusedIdx number
+---@param mainWinId  number
 function TabBar:SetTabs(termTabs, focusedIdx, mainWinId)
   self:Hide()
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
@@ -139,9 +57,9 @@ function TabBar:SetTabs(termTabs, focusedIdx, mainWinId)
   local width  = self.tabConfig.width
   local height = self.tabConfig.height
 
-  for _, tabName in ipairs(termTabs) do
+  for i, tabName in ipairs(termTabs) do
     local tab
-    tab = Tab:New(tabName, col, width, height, mainWinId)
+    tab = Tab:New(i, tabName, col, width, height, mainWinId)
     table.insert(self.tabs, tab)
     col = col + width
   end
@@ -174,7 +92,6 @@ local prev_pos = nil
 
 function TabBar:Hide()
   if not self.winid or not vim.api.nvim_win_is_valid(self.winid) then
-    log("self.winid is not valid")
     return
   end
   for _, tab in ipairs(self.tabs) do
@@ -256,6 +173,9 @@ function TabBar:UpdateWidth(width)
   self.config.width = width
 end
 
-return {
-  TabBar = TabBar
-}
+function TabBar:Rename(termID)
+  log("Renaming", "Rename")
+  self.tabs[termID]:Rename()
+end
+
+return TabBar

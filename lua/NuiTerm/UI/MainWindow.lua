@@ -1,6 +1,6 @@
 --> NuiTerm/MainWindow.lua
 --
-local TabBar = require("NuiTerm.UI.TabBar").TabBar
+local TabBar = require("NuiTerm.UI.TabBar.Bar")
 
 local Utils = require("NuiTerm.utils")
 -- local TermCreate = require("NuiTerm.Term").TermCreate
@@ -9,7 +9,7 @@ local TermWindow = require("NuiTerm.UI.Term").TermWindow
 local Debug = require("NuiTerm.Debug")
 
 local log = Debug.LOG_FN("MainWindow", {
-  deactivate = true,
+  deactivate = false,
 })
 
 ---@class MainWindow
@@ -225,8 +225,8 @@ end
 function MainWindow:GetTabNames()
   local names = {}
   --TODO: Dynamic Tab sizing with padding. After adding Tab Naming Functionality
-  for i = 1, self.totalTerms do
-    table.insert(names, "   "..i.." Terminal     ")
+  for _ = 1, self.totalTerms do
+    table.insert(names, "Terminal")
   end
   return names
 end
@@ -241,12 +241,7 @@ end
 function MainWindow:Resize(arg)
   self.stateChanging = true
   local num = tonumber(arg)
-  if not num then
-    log("Arg passed is not a number: " .. arg, "Resize")
-    return
-  else
-    log("TONumber: " .. num)
-  end
+  if not num then return end
   self.winConfig.height = self.winConfig.height + arg
   self.winConfig.row = vim.o.lines - self.winConfig.height - 4
 
@@ -274,20 +269,20 @@ function MainWindow:OnResize()
         end
         self.tabBar:UpdateCol(tabCol, true)
         self.tabBar:UpdateWidth(width)
-
-        -- local width, _ = Utils.GetTermSize()
-        -- self.winConfig.width = width
-        -- self.winConfig.height = 20
-        --
-        -- for _, term in pairs(self.termWindows) do
-        --   term:UpdateConfig(self.winConfig)
-        -- end
         self:Show()
       end, 400)
     end
   })
 end
 
-return {
-  MainWindow = MainWindow
-}
+function MainWindow:Rename()
+  log("Rename", "Rename")
+  if not self.showing then
+    print("NuiTerm is not active")
+    return
+  end
+  self.tabBar:Rename(self.currentTermID)
+
+end
+
+return MainWindow
