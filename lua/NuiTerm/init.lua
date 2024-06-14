@@ -1,8 +1,8 @@
 --> NuiTerm/init.lua
 --
-local NuiTerm       = require("NuiTerm.UI.MainWindow")
-local Debug         = require("NuiTerm.Debug")
-local NuiTermSetup  = require("NuiTerm.setup")
+local NuiTerm         = require("NuiTerm.UI.MainWindow")
+local UserKeyCommands = require("NuiTerm.Keymap.userCmds")
+local NuiTermSetup    = require("NuiTerm.setup")
 
 local M = {}
 M.keyMaps = NuiTermSetup.keyMaps
@@ -50,82 +50,6 @@ M.Shrink = function()
   M.MainWindow:Resize(NuiTermSetup.keyMaps.term_resize.shrink.amt)
 end
 
-for _, cmd in pairs({
-  {
-    cmd = "DebugShow",
-    fn = function() Debug.create_or_get_debug_window() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "DebugHide",
-    fn = function() Debug.hide_debug_window() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "DebugToggle",
-    fn = function() Debug.ToggleDebug() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "ToggleWindow",
-    fn  = function() M.MainWindow:Toggle() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "ShowWindow",
-    fn  = function() M.MainWindow:Show() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "HideWindow",
-    fn  = function() M.MainWindow:Hide() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "Resize",
-    fn = function(opts) M.MainWindow:Resize(opts.args) end,
-    opts = { nargs = 1 },
-  },
-  {
-    cmd = "NewTerm",
-    fn  = function() M.MainWindow:NewTerm() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "DelTerm",
-    fn  = function(opts)
-      local term_id = tonumber(opts.args)
-      if term_id then
-        M.MainWindow:DeleteTerm(term_id)
-      end
-    end,
-    opts = { nargs = 1 }
-  },
-  {
-    cmd = "DeleteCurrentTerm",
-    fn  = function() M.MainWindow:DeleteTerm(nil) end,
-    opts = { nargs = 1 }
-  },
-  {
-    cmd = "ToTerm",
-    fn = function(opts)
-      local term_id = tonumber(opts.args)
-      M.MainWindow:ToTerm(term_id)
-    end,
-    opts = { nargs = 1 }
-  },
-  {
-    cmd = "NextTerm",
-    fn  = function() M.MainWindow:NextTerm() end,
-    opts = { nargs = 0 }
-  },
-  {
-    cmd = "PrevTerm",
-    fn  = function() M.MainWindow:PrevTerm() end,
-    opts = { nargs = 0 }
-  },
-}) do
-  vim.api.nvim_create_user_command("NuiTerm"..cmd.cmd, cmd.fn, cmd.opts)
-end
+UserKeyCommands.UserCommandSetup(M)
 
 return M

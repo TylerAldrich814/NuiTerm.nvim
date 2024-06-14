@@ -36,7 +36,6 @@ local Tab = {
 function Tab:New(
   name,
   col,
-  row,
   width,
   height,
   mainWinId
@@ -54,9 +53,8 @@ function Tab:New(
     zindex    = 100,
     focusable = false,
     col       = col,
-    -- row       = row,
-    row = 0,
-    width     = width,
+    row       = -1,
+    width     = width-2, --TODO: Remove '-2' once you get dynamic Tab Width established!
     height    = height,
   }
   Utils.PreventFileOpenInTerm(obj.bufnr)
@@ -137,17 +135,15 @@ end
 function TabBar:SetTabs(termTabs, focusedIdx, mainWinId)
   self:Hide()
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
-  local row    = self.tabConfig.row
-  local col    = 0-- self.tabConfig.col
+  local col    = 1
   local width  = self.tabConfig.width
   local height = self.tabConfig.height
 
-  log("Col: " .. self.tabConfig.col .. "Row: " .. self.tabConfig.row)
   for _, tabName in ipairs(termTabs) do
     local tab
-    tab = Tab:New(tabName, col, row, width, height, mainWinId)
+    tab = Tab:New(tabName, col, width, height, mainWinId)
     table.insert(self.tabs, tab)
-    col = col + width + 1
+    col = col + width
   end
 
   for _, tab in ipairs(self.tabs) do

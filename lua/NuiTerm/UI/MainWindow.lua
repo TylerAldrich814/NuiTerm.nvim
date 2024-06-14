@@ -226,7 +226,7 @@ function MainWindow:GetTabNames()
   local names = {}
   --TODO: Dynamic Tab sizing with padding. After adding Tab Naming Functionality
   for i = 1, self.totalTerms do
-    table.insert(names, "    Terminal " .. i .. "    ")
+    table.insert(names, "   "..i.." Terminal     ")
   end
   return names
 end
