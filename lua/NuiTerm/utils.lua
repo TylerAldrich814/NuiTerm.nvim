@@ -4,8 +4,7 @@
 local M = {}
 local Debug = require("NuiTerm.Debug").Debug
 
-M.WinHeight = 30
-
+M.OriginalWidthSetting = nil
 M.GetTermSize = function()
   local width = vim.o.columns
   local height = vim.o.lines
@@ -16,68 +15,6 @@ M.GetMousePos = function()
   return pcall(vim.fn.getmousepos)
 end
 
-M.WindowConfig = function(config)
-  if not config then
-    error("CONFIG IS NIL", 2)
-  end
-
-  local width    = config.width or vim.o.columns
-  local height   = config.height or M.WinHeight
-  local position = config.position or "bottom"
-  local style    = config.style or "minimal"
-  local border   = config.border or "rounded"
-  local row, col = 0, 0
-
-  if position == "bottom" then
-    row = vim.o.lines - height - 4
-  elseif position == "top" then
-    row = 4
-  else
-    error("\n     - NuiTerm: setup.position --> Found an unknown value - \"" .. position .. "\"")
-  end
-
-  return {
-    relative = "editor",
-    width    = width,
-    height   = height,
-    style    = style,
-    border   = border,
-    row      = row,
-    col      = col
-  }
-end
-
-M.TabBarConfig = function(config)
-  local winWidth  = config.width or vim.o.columns
-  local winHeight = config.height or M.WinHeight
-  local position  = config.position or "bottom"
-
-  local tabRow = 0
-  if position == "bottom" then
-    tabRow = vim.o.lines - winHeight - 5
-  elseif position == "top" then
-    tabRow = 3
-  end
-
-  return {
-    MainBar = {
-      relative = "editor",
-      width     = winWidth,
-      height    = 1,
-      row       = tabRow,
-      col       = 0,
-      style     = "minimal",
-      border    = "none",
-      focusable = false,
-    },
-    Tab = {
-      col = 0,
-      row = tabRow,
-      width  = 20,
-      height = 1,
-    },
-  }
-end
 
 M.PreventFileOpenInTerm = function(bufnr)
   local blocked_cmds = {"edit", "e", "split", "sp", "vsplit", "vsp", "tabedit", "tabe", "q", "q!"}
@@ -94,6 +31,74 @@ M.PreventFileOpenInTerm = function(bufnr)
     })
   end
   vim.api.nvim_buf_set_keymap(bufnr, "n", "o", "<nop>", { noremap=true, silent=true })
+end
+
+
+---@param tWidth number
+---@param divisor number
+function CalculateCoordinates(tWidth, divisor)
+  local termWidth = vim.o.columns
+  local winCol   = 0
+  local tabCol   = 0 -- For Alignment: TabBar needs to be more specifc because TermWidow's border takes up +1 row/col around the window
+  tWidth = math.floor(termWidth * (divisor))
+  if termWidth % 2 == 1 and tWidth % 2 == 0 then
+    tWidth = tWidth - 1
+    tabCol = -2
+  elseif termWidth % 2 == 0 and tWidth % 2 == 1 then
+    tWidth = tWidth + 1
+    tabCol = 2
+  end
+  winCol = math.ceil(termWidth/2) - math.floor(tWidth/2)
+  tabCol = tabCol + winCol
+  return tWidth, winCol, tabCol
+end
+
+--- Returns Window Width, Width x position, TabBar X position 
+---@param width number|string
+M.WidthPCT = function (width)
+  M.OriginalWidthSetting = width
+  local termWidth = vim.o.columns
+
+  -- No point in having a termianl window smaller then 144
+  if termWidth < 144 then return termWidth, 0, 0 end
+
+  if type(width) == "number" then
+    -- return width, 0, 0
+    local divisor = math.floor(width / vim.o.columns)
+    if divisor > 1.0 then
+      return termWidth, 0, 0
+    end
+    return CalculateCoordinates(width, divisor)
+  end
+
+  if type(width) == "string" then
+    local num, den = string.match(width, "^(%d+)/(%d+)$")
+    if not num or not den then
+      -- return termWidth, winCol, tabCol
+      return termWidth, 0, 0
+    end
+
+    num, den = tonumber(num), tonumber(den)
+    if num > den then
+      return termWidth, 0, 0
+    end
+
+    return CalculateCoordinates(termWidth, num/den)
+  end
+  print("Unknown type for width: "..type(width))
+  return termWidth, 0, 0
+end
+
+--TODO: Redo how you handle NuiTerm's Resizing/repositioing during Terminal resize.
+-- After you intergrated chaning NuiTerms width with auto centering. You noticed that
+-- the old way of resizing now messes with this.
+--
+-- You need to globally store the users preference for 'width' i.e., if it's a percentage
+-- then we'll need that here. 
+-- Next, during MainWindow.OnResize. You'll need to handle MainWindow Resiizing and TabBar
+-- resize
+M.ResizeAndPosition = function()
+  return M.WidthPCT(M.OriginalWidthSetting)
 end
 
 return M

@@ -1,8 +1,8 @@
 --> NuiTerm/init.lua
 --
-local NuiTermSetup  = require("NuiTerm.setup")
 local NuiTerm       = require("NuiTerm.UI.MainWindow")
 local Debug         = require("NuiTerm.Debug")
+local NuiTermSetup  = require("NuiTerm.setup")
 
 local M = {}
 M.keyMaps = NuiTermSetup.keyMaps

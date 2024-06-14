@@ -32,7 +32,6 @@ local MainWindow = {
   currentTermID  = nil,
   termWindows    = {},
   winConfig      = {},
-  tabBar         = TabBar,
   resizeCmdID    = nil,
   stateChanging  = false,
 }
@@ -233,7 +232,7 @@ function MainWindow:GetTabNames()
 end
 
 function MainWindow:UpdateTabBar()
-  self.tabBar:SetTabs(self:GetTabNames(), self.currentTermID)
+  self.tabBar:SetTabs(self:GetTabNames(), self.currentTermID, self.winid)
 end
 
 --- TuiTerm Resizing ---
@@ -255,7 +254,7 @@ function MainWindow:Resize(arg)
     term:UpdateConfig(self.winConfig)
   end
   self:Hide()
-  self.tabBar:UpdatePos(arg)
+  self.tabBar:UpdateRow(arg, false)
   self:Show()
   self.stateChanging = false
 end
@@ -265,14 +264,24 @@ function MainWindow:OnResize()
     callback = function()
       vim.defer_fn(function()
         self:NormMode()
-        local width, _ = Utils.GetTermSize()
-        self.winConfig.width = width
-        self.winConfig.height = 20
+        self:Hide()
+        local width, winCol, tabCol = Utils.ResizeAndPosition()
+        self.winConfig.width  = width
+        self.winConfig.col = winCol
 
         for _, term in pairs(self.termWindows) do
           term:UpdateConfig(self.winConfig)
         end
-        self:Hide()
+        self.tabBar:UpdateCol(tabCol, true)
+        self.tabBar:UpdateWidth(width)
+
+        -- local width, _ = Utils.GetTermSize()
+        -- self.winConfig.width = width
+        -- self.winConfig.height = 20
+        --
+        -- for _, term in pairs(self.termWindows) do
+        --   term:UpdateConfig(self.winConfig)
+        -- end
         self:Show()
       end, 400)
     end

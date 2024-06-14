@@ -1,5 +1,6 @@
 --> NuiTerm/setup.lua
 --
+local Utils = require("NuiTerm.utils")
 local defaultSettings = require("NuiTerm.defaults")
 local M = {}
 
@@ -24,50 +25,6 @@ local function mergeConfigs(defaults, overrides)
   return overrides
 end
 
----@param width number|string
-local function WidthPCT(width)
-  if type(width) == "number" then
-    print("Widht is a number: " .. width)
-    return width, 0, 0
-  end
-  local termWidth = vim.o.columns
-  local winCol   = 0
-  local tabCol   = 0
-  local nuiWidth = 0
-
-  if type(width) == "string" then
-    local num, den = string.match(width, "^(%d+)/(%d+)$")
-    if not num or not den then
-      print("win_config.width: Found to be a string. But was not a valid width command: \""..width.."\"")
-      width = termWidth
-      return termWidth, winCol, tabCol
-    end
-
-    num, den = tonumber(num), tonumber(den)
-    if num > den then
-      width = termWidth
-      print("win_config.width: Found to be a percentage command. But width > 1.0 : \""..width.."\"")
-      return termWidth, winCol, tabCol
-    end
-
-    nuiWidth = math.floor(termWidth * (num/den))
-    if termWidth % 2 == 1 and nuiWidth % 2 == 0 then
-      nuiWidth = nuiWidth + 1
-      tabCol = 2
-    elseif termWidth % 2 == 0 and nuiWidth % 2 == 1 then
-      nuiWidth = nuiWidth - 1
-      tabCol = -2
-    end
-    winCol = math.ceil(termWidth/2) - math.floor(nuiWidth/2)
-    tabCol = tabCol + winCol
-    width = nuiWidth
-  end
-  print("- TermWidth: " .. termWidth)
-  print("-  nuiWidth: " .. nuiWidth)
-  print("-    winCol: " .. winCol)
-  print("-    tabCol: " .. tabCol)
-  return nuiWidth, winCol, tabCol
-end
 
 M.WindowConfig = function(config)
   if not config then
@@ -75,7 +32,7 @@ M.WindowConfig = function(config)
   end
 
   local position = config.position or "bottom"
-  local width, col, _ = WidthPCT(config.width or vim.o.columns)
+  local width, col, _ = Utils.WidthPCT(config.width or vim.o.columns)
   local row = 0
 
   if position == "bottom" then
@@ -98,7 +55,7 @@ M.WindowConfig = function(config)
 end
 
 M.TabBarConfig = function(config)
-  local width, col, _ = WidthPCT(config.width or vim.o.columns)
+  local width, col, _ = Utils.WidthPCT(config.width or vim.o.columns)
 
   local height = config.height or M.WinHeight
   local position  = config.position or "bottom"
@@ -112,7 +69,7 @@ M.TabBarConfig = function(config)
 
   return {
     MainBar = {
-      relative  = "editor",
+      relative  = "win",
       width     = width+2, -- no border padding
       height    = 1,
       row       = row,
@@ -140,5 +97,6 @@ function M.setup(opts)
   M.keyMaps   = key
   M.winConfig = M.WindowConfig(win)
 end
+
 
 return M
