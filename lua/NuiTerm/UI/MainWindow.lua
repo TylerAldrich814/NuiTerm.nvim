@@ -35,7 +35,28 @@ local MainWindow = {
   stateChanging  = false,
 }
 
-function MainWindow:New(winConfig, tabBarConfig)
+function MainWindow:NewNew(winConfig, tabBarConfig, tabConfig)
+  if not winConfig then
+    error("MainWindow:new --> Window Configuration for MainWindow cannot be nil", 2)
+  end
+  if not tabBarConfig then
+    error("MainWindow:new --> TabBar Configuration for MainWindow cannot be nil", 2)
+  end
+  local obj = setmetatable({}, { __index = self })
+  obj.nsid = vim.api.nvim_create_namespace("NuiTerm")
+  obj.winConfig = winConfig
+  obj.tabBar    = TabBar:NewNew(
+    tabBarConfig,
+    tabConfig,
+    function(idx)
+      self:ShowTerminal(idx)
+    end
+  )
+  obj.termWindows = {}
+  return obj
+end
+
+function MainWindow:new(winConfig, tabBarConfig)
   if not winConfig then
     error("MainWindow:new --> Window Configuration for MainWindow cannot be nil", 2)
   end

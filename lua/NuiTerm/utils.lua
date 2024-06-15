@@ -2,6 +2,7 @@
 --
 
 local M = {}
+local Debug = require("NuiTerm.Debug").Debug
 
 M.OriginalWidthSetting = nil
 M.GetTermSize = function()
@@ -14,6 +15,23 @@ M.GetMousePos = function()
   return pcall(vim.fn.getmousepos)
 end
 
+M.MergeConfigs = function(defaults, overrides)
+  for k, v in pairs(defaults) do
+    if type(v) ~= "table" then
+      overrides[k] = overrides[k] or v
+      goto continue
+    end
+
+    if not overrides[k] then
+      overrides[k] = v
+    elseif type(overrides[k]) ~= 'table' then
+      error("Keymap: \""..k.." should be a table")
+    end
+    overrides[k] = M.NergeConfigs(v, overrides[k])
+    ::continue::
+  end
+  return overrides
+end
 
 M.PreventFileOpenInTerm = function(bufnr)
   local blocked_cmds = {"edit", "e", "split", "sp", "vsplit", "vsp", "tabedit", "tabe", "q", "q!"}

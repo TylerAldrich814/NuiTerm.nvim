@@ -7,7 +7,8 @@ local M = {}
 M.NSID = vim.api.nvim_create_namespace("NuiTerm")
 M.WinHeight = 30
 
-local function mergeConfigs(defaults, overrides) for k, v in pairs(defaults) do
+local function mergeConfigs(defaults, overrides)
+  for k, v in pairs(defaults) do
     if type(v) ~= "table" then
       overrides[k] = overrides[k] or v
       goto continue

@@ -34,6 +34,21 @@ local TabBar = {
 
 ---@param config  table
 ---@param onClick function
+function TabBar:NewNew(config, tabConfig, onClick)
+  if not config then
+    error("TabBarConfig is nil", 2)
+  end
+  local obj = setmetatable({}, {__index = self})
+  obj.bufnr = vim.api.nvim_create_buf(false, true)
+  vim.bo[obj.bufnr].bufhidden = "hide"
+  obj.config    = config.MainBar
+  obj.tabConfig = config.Tab
+  obj.onClick   = onClick
+  return obj
+end
+
+---@param config  table
+---@param onClick function
 function TabBar:New(config, onClick)
   if not config then
     error("TabBarConfig is nil", 2)

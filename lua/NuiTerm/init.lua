@@ -3,6 +3,7 @@
 local NuiTerm         = require("NuiTerm.UI.MainWindow")
 local UserKeyCommands = require("NuiTerm.Keymap.userCmds")
 local NuiTermSetup    = require("NuiTerm.setup")
+local NTEventDispatcher = require("NuiTerm.Events.EventDispatcher").NTEventDispatcher
 
 local M = {}
 M.keyMaps = NuiTermSetup.keyMaps
@@ -17,7 +18,7 @@ M.setup = function(opts)
 
   local tabBarConfig = NuiTermSetup.TabBarConfig(opts.win_config)
 
-  M.MainWindow = NuiTerm:New(winConfig, tabBarConfig)
+  M.MainWindow = NuiTerm:new(winConfig, tabBarConfig)
 
   vim.keymap.set(
     'n',
