@@ -1,6 +1,6 @@
---> NuiTerm/TabBar/Tab.lua
+--> Nuimerm/TabBar/Tab.lua
 --
-local Utils = require("NuiTerm.utils")
+
 local log = require("NuiTerm.Debug").LOG_FN("Tab", {
   deactivate = false,
 })
@@ -54,31 +54,29 @@ function Tab:New(
   mainWinId
 )
   local obj = setmetatable({}, {__index = self})
-  obj.name = name
-  obj.bufnr = vim.api.nvim_create_buf(false, true)
+  obj.name   = name
+  obj.bufnr  = vim.api.nvim_create_buf(false, true)
   obj.config = TabConfig(mainWinId, col, width, height)
-  obj.idx = idx
+  obj.idx    = idx
 
-  vim.bo[obj.bufnr].buftype = "nofile"
   vim.bo[obj.bufnr].bufhidden = "hide"
-  -- Utils.PreventFileOpenInTerm(obj.bufnr)
+  -- vim.bo[obj.bufnr].buftype   = "prompt"
   return obj
 end
 
+-- Formats self.name into the Displayed name in the Tab.
+-- If the chosen name does not fit wihtin the constrains 
+-- set forth by tab.config.width.
+-- If self.name is too long, we splice and add an elipsis
+-- before adding it to the UI
 function Tab:CompileName()
-  -- |     <tab-width>     |
-  -- if - MyLongTerminalName
-  -- |  1 - MyLongTerm...  |
-  -- if - Terminal
-  -- |  1 - Termianl       |
   local width = self.config.width
-  local tabName = string.format("  %d - %s", self.idx, self.name)
-  local padding = width - #tabName
+  local tabName = string.format(" %d ▎%s", self.idx, self.name)
+  local padding = width - #tabName + 2
   if padding >= 2 then
     tabName = string.format("%s%s", tabName, string.rep(" ", padding))
   else
-    --- Cut last 3 characters of tabName, add '...' and 2 spaces
-    tabName = string.format("%s...  ",string.sub(tabName, 0, width-5))
+    tabName = string.format("%s...  ",string.sub(tabName, 0, width-3))
   end
 
   return tabName
@@ -91,9 +89,10 @@ function Tab:Display(onClick)
   end
 
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
-  -- vim.wo.winfixbuf = true
 
-  vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { 
+  -- vim.wo[self.winid].winfixbuf = true
+
+  vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, {
     -- self.name 
     self:CompileName()
   })
@@ -119,26 +118,6 @@ function Tab:Hide()
   log("Hiding Tab Bufnr: ".. self.bufnr .. " Winid: " .. self.winid)
   vim.api.nvim_win_hide(self.winid)
   self.winid = nil
-end
-
-function Tab:Rename()
-  log("Renaming", "Rename")
-  local store_bufnr = api.nvim_get_current_buf()
-  local store_winid = api.nvim_get_current_win()
-
-  api.nvim_win_set_cursor(self.winid, {1, 0})
-  -- vim.api.nvim_feedkeys('i', 'n', true)
-  -- api.nvim_feedkeys(api.nvim_replace_termcodes('<Esc>^', true, false, true).. 'ce', 'm', false)
-
-  -- api.nvim_create_autocmd('BufLeave', {
-  --   buffer = store_bufnr,
-  --   callback = function()
-  --     local new_name = api.nvim_buf_get_lines(store_bufnr, 0, 1, false)[1]
-  --     self.name = new_name
-  --   end,
-  --   once = true
-  -- })
-
 end
 
 return Tab

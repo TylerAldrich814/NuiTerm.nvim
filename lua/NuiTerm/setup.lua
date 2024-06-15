@@ -7,8 +7,7 @@ local M = {}
 M.NSID = vim.api.nvim_create_namespace("NuiTerm")
 M.WinHeight = 30
 
-local function mergeConfigs(defaults, overrides)
-  for k, v in pairs(defaults) do
+local function mergeConfigs(defaults, overrides) for k, v in pairs(defaults) do
     if type(v) ~= "table" then
       overrides[k] = overrides[k] or v
       goto continue
@@ -70,7 +69,7 @@ M.TabBarConfig = function(config)
   return {
     MainBar = {
       relative  = "win",
-      width     = width+2, -- no border padding
+      width     = 2, -- no border padding
       height    = 1,
       row       = row,
       col       = col,
@@ -81,8 +80,9 @@ M.TabBarConfig = function(config)
     Tab = {
       col    = col,
       row    = row,
-      width  = 20,
+      width  = 25,
       height = 1,
+      nuiWidth = width,
     },
   }
 end

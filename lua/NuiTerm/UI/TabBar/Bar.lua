@@ -173,9 +173,117 @@ function TabBar:UpdateWidth(width)
   self.config.width = width
 end
 
-function TabBar:Rename(termID)
-  log("Renaming", "Rename")
-  self.tabs[termID]:Rename()
+---@ RENAMING Functions <---
+
+---@param renameBufnr number
+---@param callback    function
+---@param cleanup     function
+local function RenameOnEnterCallback(renameBufnr, callback, cleanup)
+  local function onLeave()
+    cleanup()
+  end
+  local function onHitEnter()
+    local newName = api.nvim_buf_get_lines(renameBufnr, 0, 1, false)[1]
+    onLeave()
+    callback(newName)
+  end
+  api.nvim_buf_set_keymap(renameBufnr, 'i', '<CR>', '', {
+    noremap  = true,
+    silent   = true,
+    callback = onHitEnter
+  })
+  api.nvim_buf_set_keymap(renameBufnr, 'n', '<CR>', '', {
+    noremap  = true,
+    silent   = true,
+    callback = onHitEnter
+  })
+  api.nvim_buf_set_keymap(renameBufnr, 'n', '<Esc>', '', {
+    noremap  = true,
+    silent   = true,
+    callback = onLeave,
+  })
+
+  api.nvim_create_autocmd({"WinLeave", "BufLeave"}, {
+    buffer = renameBufnr,
+    callback = function()
+      onLeave()
+    end,
+    once = true
+  })
 end
+
+---@param mainWinId      number
+---@param mainWinHeight  number
+---@param termID         number
+---@param renameCallback function  
+function TabBar:Rename(mainWinId, mainWinHeight, termID, renameCallback)
+  local curTab     = self.tabs[termID]
+  local renameText = " Rename: "
+  local currentWin = api.nvim_get_current_win()
+  local tabWidth   = self.tabConfig.width+10
+  local tabHeight  = 1
+  local termWidth  = self.tabConfig.nuiWidth
+  local center     = math.floor(termWidth/2)
+  if center % 2 == 1 then center = center-1 end
+  local renamePopupWidth = tabWidth+#renameText
+
+  local renameSignOpts = {
+    relative = "win",
+    win      = mainWinId,
+    width    = 10,
+    height   = tabHeight,
+    style    = "minimal",
+    border   = "rounded",
+    row      = mainWinHeight,
+    col      = center-math.floor(renamePopupWidth/2)-#renameText
+  }
+  local renameWindowOpts = {
+    relative = "win",
+    win      = mainWinId,
+    width    = tabWidth+10,
+    height   = tabHeight,
+    style    = "minimal",
+    border   = "rounded",
+    row      = mainWinHeight,
+    col      = center-math.floor(renamePopupWidth/2)
+  }
+  local renameSignBuf    = api.nvim_create_buf(false, true)
+  local renameWindowBuf  = api.nvim_create_buf(false, true)
+
+  local renameSign = api.nvim_open_win(renameSignBuf, false, renameSignOpts)
+  local renameWindow = api.nvim_open_win(renameWindowBuf, true, renameWindowOpts)
+
+  api.nvim_buf_set_lines(renameWindowBuf, 0, -1, false, {curTab.name})
+  api.nvim_buf_set_lines(renameSignBuf, 0, -1, true, {renameText})
+
+  vim.bo[renameSignBuf].modifiable  = false
+  vim.bo[renameWindowBuf].bufhidden = "wipe"
+  vim.bo[renameSignBuf].bufhidden   = "wipe"
+
+  api.nvim_win_set_cursor(renameWindow,{ 1, #curTab.name+1 })
+  api.nvim_feedkeys('a', 'i', true)
+
+  RenameOnEnterCallback(renameWindowBuf,
+    function(newName)
+      renameCallback(newName)
+    end,
+    function()
+      if api.nvim_win_is_valid(renameSign) then
+        api.nvim_win_close(renameSign, true)
+      end
+      if api.nvim_win_is_valid(renameWindow) then
+        api.nvim_win_close(renameWindow, true)
+      end
+      if api.nvim_buf_is_valid(renameSignBuf) then
+        api.nvim_buf_delete(renameSignBuf, { force = false } )
+      end
+      if api.nvim_buf_is_valid(renameWindowBuf) then
+        api.nvim_buf_delete(renameWindowBuf, { force = true})
+      end
+      api.nvim_win_set_cursor(currentWin, {4, 3})
+    end
+  )
+end
+
 
 return TabBar

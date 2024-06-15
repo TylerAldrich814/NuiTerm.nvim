@@ -1,7 +1,7 @@
 --> NuiTerm/MainWindow.lua
 --
 local TabBar = require("NuiTerm.UI.TabBar.Bar")
-
+local Keymaps = require("NuiTerm.Keymap.Term")
 local Utils = require("NuiTerm.utils")
 -- local TermCreate = require("NuiTerm.Term").TermCreate
 local TermWindow = require("NuiTerm.UI.Term").TermWindow
@@ -30,7 +30,6 @@ local MainWindow = {
   showing        = false,
   totalTerms     = 0,
   currentTermID  = nil,
-  termWindows    = {},
   winConfig      = {},
   resizeCmdID    = nil,
   stateChanging  = false,
@@ -52,6 +51,7 @@ function MainWindow:New(winConfig, tabBarConfig)
       self:ShowTerminal(idx)
     end
   )
+  obj.termWindows = {}
   return obj
 end
 
@@ -81,15 +81,18 @@ function MainWindow:ShowTerminal(id)
     blend = 90,
     fg = "#FFFFF0"
   })
+  vim.defer_fn(function()
+    vim.api.nvim_win_set_cursor(winid, {4, 4})
+  end,200)
   self.winid = winid
 end
 
 function MainWindow:Show()
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  if not self.stateChanging then
-    self:TermMode()
-  end
+  -- if not self.stateChanging then
+  --   self:TermMode()
+  -- end
   self.showing = true
   self:OnResize()
   self:CtrlMode()
@@ -112,6 +115,11 @@ function MainWindow:Hide()
   self.showing = false
 
   vim.api.nvim_del_autocmd(self.resizeCmdID)
+end
+
+function MainWindow:ReloadUI()
+  self:Hide()
+  self:Show()
 end
 
 function MainWindow:Toggle()
@@ -224,9 +232,8 @@ end
 
 function MainWindow:GetTabNames()
   local names = {}
-  --TODO: Dynamic Tab sizing with padding. After adding Tab Naming Functionality
-  for _ = 1, self.totalTerms do
-    table.insert(names, "Terminal")
+  for i = 1, self.totalTerms do
+    table.insert(names, self.termWindows[i].name)
   end
   return names
 end
@@ -276,13 +283,22 @@ function MainWindow:OnResize()
 end
 
 function MainWindow:Rename()
-  log("Rename", "Rename")
   if not self.showing then
     print("NuiTerm is not active")
     return
   end
-  self.tabBar:Rename(self.currentTermID)
-
+  Keymaps.RemoveTermKeymaps(self.termWindows[self.currentTermID].bufnr)
+  self.tabBar:Rename(
+    self.winid,
+    self.winConfig.height,
+    self.currentTermID,
+    function(newName)
+      self.termWindows[self.currentTermID].name = newName
+      self:ReloadUI()
+      self:NormMode()
+    end
+  )
+  Keymaps.AddTermKeyMaps(self.termWindows[self.currentTermID].bufnr)
 end
 
 return MainWindow

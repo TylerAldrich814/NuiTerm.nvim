@@ -13,6 +13,7 @@ M.winConfig = function()
 end
 M.keyMaps = {
   change_mode    = "<Esc>",
+  rename_term    = "<leader>tr",
   nuiterm_toggle = "<leader>tt",
   new_term       = "<leader>tn",
   next_term      = "<leader>tk",

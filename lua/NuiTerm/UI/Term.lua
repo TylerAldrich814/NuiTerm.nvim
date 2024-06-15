@@ -26,7 +26,7 @@ local TermWindow = {
   bufnr       = nil,
   winid       = nil,
   termid      = nil,
-  name        = "Terminal",
+  name        = "NuiTerm",
   autocmdid   = nil,
   config      = {},
   onHide      = nil,
@@ -57,7 +57,6 @@ function TermWindow:Init(termid, config)
   vim.bo[bufnr].buftype    = "acwrite"
   vim.bo[bufnr].modifiable = false
 
-  vim.wo.winfixbuf = true -- Disables loading files in TermWindow
 
   obj.originalMouse = vim.o.mouse
   obj.bufnr = bufnr
@@ -115,11 +114,13 @@ function TermWindow:Show(onLeave)
     error("TermWindow:Show(): Self.config is nil", 2)
   end
   local winid = api.nvim_open_win(self.bufnr, true, self.config)
+  vim.wo[winid].winfixbuf = true -- Disables loading files in TermWindow
+
   self.winid  = winid
   self.onHide = onLeave
   self:SpawnShell(onLeave)
   self.showing = true;
-  Keymaps.CreateTermKeyMaps(self.bufnr)
+  Keymaps.AddTermKeyMaps(self.bufnr)
   return winid
 end
 

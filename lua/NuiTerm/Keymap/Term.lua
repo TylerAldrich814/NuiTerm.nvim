@@ -4,13 +4,13 @@ local api = vim.api
 local M = {}
 
 ---@param bufnr number
-M.CreateTermKeyMaps = function(bufnr)
+M.AddTermKeyMaps = function(bufnr)
   -- When the user moves the focus from the NuiTerm Window to another neovim window,
   -- we call this autocmd. Which in turn calls our 'onLeave' callback, i.e., MainWindow:Hide()
   --TODO: We need to somehow detect if the focus left both the Term window AND the tabs window(s)
   --      This might require returning a paramter to 'onLeave' Telling MainWindow:Hide() which function
   --      called it( since we have a handful of functions that call Hide) That way if we tell onLeave that
-  --      this AutoCMD is calling it, we can then detect if our focus is on the tabbar or not.
+  --      this AutoCMD is calling it, ff we can then detect if our focus is on the tabbar or not.
 
   -- When moving outside of NuiTerm Bufnr
   -- autocmdid = api.nvim_create_autocmd({ "WinLeave" }, {
@@ -129,6 +129,17 @@ M.CreateTermKeyMaps = function(bufnr)
       }
     )
   end
+
+  api.nvim_buf_set_keymap(
+    bufnr,
+    'n',
+    require("NuiTerm").keyMaps.rename_term,
+    [[<cmd>:NuiTermRename<CR>]],
+    {
+      noremap = true,
+      silent  = true,
+    }
+  )
 end
 
 ---@param bufnr number
