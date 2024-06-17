@@ -12,16 +12,6 @@ local log = Debug.LOG_FN("TermWindow", {
 })
 
 ---@class TermWindow
----@field bufnr       number|nil
----@field winid       number|nil
----@field termid      number|nil
----@field name        string
----@field autocmdid   number|nil
----@field config      table
----@field onHide      function|nil
----@field showing     boolean
----@field spawned     boolean
----@field initialized boolean
 local TermWindow = {
   bufnr       = nil,
   winid       = nil,
@@ -40,8 +30,9 @@ function TermWindow:IsBufValid()
   local valid = self.bufnr and api.nvim_buf_is_valid(self.bufnr)
   if not valid then
     log("Bufnr was somehow deleted!", "IsBufValid")
+    return false
   end
-  return valid
+  return true
 end
 
 -- Function to Create a new Termianl Instance
@@ -147,8 +138,4 @@ function TermWindow:UpdateConfig(config)
   self.config = config
 end
 
-
-
-return {
-  TermWindow = TermWindow,
-}
+return TermWindow

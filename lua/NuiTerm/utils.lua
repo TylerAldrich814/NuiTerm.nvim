@@ -2,7 +2,30 @@
 --
 
 local M = {}
-local Debug = require("NuiTerm.Debug").Debug
+local log = require("NuiTerm.Debug").LOG_FN("config", {
+  deactivated = false
+})
+
+---@alias close_win_if_valid fun(winid: number, force: boolean): unknown
+
+---@param winid number
+---@param force boolean
+M.close_win_if_valid = function(winid, force)
+  log("winid: "..winid, "close_win_if_valid")
+  if not vim.api.nvim_win_is_valid(winid) then
+    error(string.format("Provided winid( %d ) is not valid", winid), 1)
+  end
+  vim.api.nvim_win_close(winid, force)
+end
+---@param bufnr number
+---@param force boolean
+M.delete_bufnr_if_valid = function(bufnr, force)
+  log("bufnr: "..bufnr, "delete_bufnr_if_valid")
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    error(string.format("Provided bufnr( %d ) is not valud", bufnr), 1)
+  end
+  vim.api.nvim_buf_delete(bufnr, { force = force })
+end
 
 M.OriginalWidthSetting = nil
 M.GetTermSize = function()
@@ -16,6 +39,8 @@ M.GetMousePos = function()
 end
 
 M.MergeConfigs = function(defaults, overrides)
+  if not overrides then return defaults end
+
   for k, v in pairs(defaults) do
     if type(v) ~= "table" then
       overrides[k] = overrides[k] or v

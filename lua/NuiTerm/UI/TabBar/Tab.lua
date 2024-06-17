@@ -45,7 +45,7 @@ local Tab = {
 ---@param col      number
 ---@param width    number
 ---@param height   number
-function Tab:New(
+function Tab:new(
   idx,
   name,
   col,

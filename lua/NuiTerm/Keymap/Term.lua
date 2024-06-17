@@ -24,32 +24,33 @@ M.AddTermKeyMaps = function(bufnr)
 
   -- Mode Keymaps
   --- If in 'terminal' mode, Hitting <Esc> will call MainWindow:NormMode -- Putting you into Normal Mode
+  -- [[<cmd>lua require('NuiTerm').MainWindow:NormMode()<CR>]],
   api.nvim_buf_set_keymap(
     bufnr,
     't',
     '<Esc>',
-    [[<cmd>lua require('NuiTerm').MainWindow:NormMode()<CR>]],
+    [[<cmd>lua require('NuiTerm').eventController.nuiTermWindow:NormMode()<CR>]],
     {
       noremap = true,
       silent  = true,
     }
   )
 
-  api.nvim_buf_set_keymap(
-    bufnr,
-    "i",
-    "<LeftDrag>",
-    "<nop>",
-    { noremap = true, silent = true }
-  )
-  api.nvim_buf_set_keymap(
-    bufnr,
-    "i",
-    "<LeftRelease>",
-    "<nop>",
-    { noremap = true, silent = true }
-  )
-
+  -- api.nvim_buf_set_keymap(
+  --   bufnr,
+  --   "i",
+  --   "<LeftDrag>",
+  --   "<nop>",
+  --   { noremap = true, silent = true }
+  -- )
+  -- api.nvim_buf_set_keymap(
+  --   bufnr,
+  --   "i",
+  --   "<LeftRelease>",
+  --   "<nop>",
+  --   { noremap = true, silent = true }
+  -- )
+  --
   local insert_commands = { "i", "<S-i>", "a", "<S-a>" }
   -- If in 'Normal' mode, Hitting 'i' will call MainWindow:TermMode -- Putting you into TerminalMode
   for _, cmd in ipairs(insert_commands) do
@@ -57,7 +58,7 @@ M.AddTermKeyMaps = function(bufnr)
       bufnr,
       'n',
       cmd,
-      [[<cmd>lua require('NuiTerm').MainWindow:TermMode()<CR>]],
+      [[<cmd>lua require('NuiTerm').eventController.nuiTermWindow:TermMode()<CR>]],
       {
         noremap = true,
         silent  = true,
@@ -69,7 +70,7 @@ M.AddTermKeyMaps = function(bufnr)
     bufnr,
     'n',
     "<Esc>",
-    [[<cmd>lua require('NuiTerm').MainWindow:Hide()<CR>]],
+    [[<cmd>lua require('NuiTerm').eventController:Hide()<CR>]],
     {
       noremap = true,
       silent  = true,
@@ -78,8 +79,9 @@ M.AddTermKeyMaps = function(bufnr)
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
-    require('NuiTerm').keyMaps.next_term,
-    [[<cmd>lua require('NuiTerm').MainWindow:NextTerm()<CR>]],
+    -- require('NuiTerm').keyMaps.next_term,
+    require('NuiTerm').eventController.ntConfigHandler.keymaps.next_term,
+    [[<cmd>lua require('NuiTerm').eventController:NextTerm()<CR>]],
     {
       noremap = true,
       silent  = true,
@@ -88,8 +90,8 @@ M.AddTermKeyMaps = function(bufnr)
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
-    require('NuiTerm').keyMaps.prev_term,
-    [[<cmd>lua require('NuiTerm').MainWindow:PrevTerm()<CR>]],
+    require('NuiTerm').eventController.ntConfigHandler.keymaps.prev_term,
+    [[<cmd>lua require('NuiTerm').eventController:PrevTerm()<CR>]],
     {
       noremap = true,
       silent  = true,
@@ -98,8 +100,8 @@ M.AddTermKeyMaps = function(bufnr)
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
-    require('NuiTerm').keyMaps.close_term,
-    [[<cmd>lua require('NuiTerm').MainWindow:DeleteTerm()<CR>]],
+    require('NuiTerm').eventController.ntConfigHandler.keymaps.close_term,
+    [[<cmd>lua require('NuiTerm').eventController:DelTerm()<CR>]],
     {
       noremap = true,
       silent  = true,
@@ -111,7 +113,7 @@ M.AddTermKeyMaps = function(bufnr)
     api.nvim_buf_set_keymap(
       bufnr,
       cmd,
-      require("NuiTerm").keyMaps.term_resize.expand.cmd,
+      require('NuiTerm').eventController.ntConfigHandler.keymaps.term_resize.expand.cmd,
       [[<cmd>lua require('NuiTerm').Expand()<CR>]],
       {
         noremap = true,
@@ -121,7 +123,7 @@ M.AddTermKeyMaps = function(bufnr)
     api.nvim_buf_set_keymap(
       bufnr,
       cmd,
-      require("NuiTerm").keyMaps.term_resize.shrink.cmd,
+      require('NuiTerm').eventController.ntConfigHandler.keymaps.term_resize.shrink.cmd,
       [[<cmd>lua require('NuiTerm').Shrink()<CR>]],
       {
         noremap = true,
@@ -133,8 +135,8 @@ M.AddTermKeyMaps = function(bufnr)
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
-    require("NuiTerm").keyMaps.rename_term,
-    [[<cmd>:NuiTermRename<CR>]],
+    require('NuiTerm').eventController.ntConfigHandler.keymaps.rename_term,
+    [[<cmd>lua require('NuiTerm').eventController:Rename()<CR>]],
     {
       noremap = true,
       silent  = true,

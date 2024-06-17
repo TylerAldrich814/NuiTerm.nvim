@@ -57,8 +57,8 @@ end
 M.TabBarConfig = function(config)
   local width, col, _ = Utils.WidthPCT(config.width or vim.o.columns)
 
-  local height = config.height or M.WinHeight
-  local position  = config.position or "bottom"
+  local height   = config.height or M.WinHeight
+  local position = config.position or "bottom"
 
   local row  = 0
   if position == "bottom" then

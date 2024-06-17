@@ -1,11 +1,10 @@
 --> NuiTerm/MainWindow.lua
 --
-local TabBar = require("NuiTerm.UI.TabBar.Bar")
+local EVENTS = require("NuiTerm.Events.EventDispatcher").EVENTS
+-- local TabBar = require("NuiTerm.UI.TabBar.Bar")
 local Keymaps = require("NuiTerm.Keymap.Term")
 local Utils = require("NuiTerm.utils")
--- local TermCreate = require("NuiTerm.Term").TermCreate
-local TermWindow = require("NuiTerm.UI.Term").TermWindow
--- local Term = require("NuiTerm.Term")
+local TermWindow = require("NuiTerm.UI.Term")
 local Debug = require("NuiTerm.Debug")
 
 local log = Debug.LOG_FN("MainWindow", {
@@ -13,67 +12,96 @@ local log = Debug.LOG_FN("MainWindow", {
 })
 
 ---@class MainWindow
----@field nsid          integer|nil
----@field winid         integer|nil
----@field initialized   boolean
----@field showing       boolean
----@field totalTerms    number
----@field currentTermID number|nil
----@field termWindows   TermWindow[]
----@field winConfig     table
----@field tabBar        TabBar
----@field resizeCmdID   number|nil
-local MainWindow = {
-  nsid           = nil,
-  winid          = nil,
-  initialized    = false,
-  showing        = false,
-  totalTerms     = 0,
-  currentTermID  = nil,
-  winConfig      = {},
-  resizeCmdID    = nil,
-  stateChanging  = false,
-}
+local MainWindow = { }
 
-function MainWindow:NewNew(winConfig, tabBarConfig, tabConfig)
+function MainWindow:new(dispatcher, winConfig)
   if not winConfig then
     error("MainWindow:new --> Window Configuration for MainWindow cannot be nil", 2)
   end
-  if not tabBarConfig then
-    error("MainWindow:new --> TabBar Configuration for MainWindow cannot be nil", 2)
-  end
-  local obj = setmetatable({}, { __index = self })
-  obj.nsid = vim.api.nvim_create_namespace("NuiTerm")
-  obj.winConfig = winConfig
-  obj.tabBar    = TabBar:NewNew(
-    tabBarConfig,
-    tabConfig,
-    function(idx)
-      self:ShowTerminal(idx)
-    end
-  )
-  obj.termWindows = {}
+  local obj       = setmetatable({
+    dispatcher    = dispatcher,
+    nsid          = vim.api.nvim_create_namespace("NuiTerm"),
+    winid         = nil,
+    initialized   = false,
+    showing       = false,
+    totalTerms    = 0,
+    currentTermID = nil,
+    winConfig     = winConfig,
+    resizeCmdID   = nil,
+    stateChanging = false,
+    termWindows   = {}
+  }, { __index = self })
   return obj
 end
 
-function MainWindow:new(winConfig, tabBarConfig)
-  if not winConfig then
-    error("MainWindow:new --> Window Configuration for MainWindow cannot be nil", 2)
-  end
-  if not tabBarConfig then
-    error("MainWindow:new --> TabBar Configuration for MainWindow cannot be nil", 2)
-  end
-  local obj = setmetatable({}, { __index = self })
-  obj.nsid = vim.api.nvim_create_namespace("NuiTerm")
-  obj.winConfig = winConfig
-  obj.tabBar    = TabBar:New(
-    tabBarConfig,
-    function(idx)
-      self:ShowTerminal(idx)
-    end
+function MainWindow:PushSubscriptions()
+  self.dispatcher:subscribe(EVENTS.show_nuiterm, function(_)
+    self:Show()
+  end)
+  self.dispatcher:subscribe(EVENTS.hide_nuiterm, function(_)
+    self:Hide()
+  end)
+  self.dispatcher:subscribe(EVENTS.update_ui, function(_)
+    self:UpdateUI()
+  end)
+  self.dispatcher:subscribe(EVENTS.new_terminal, function(_)
+    self:NewTerm()
+  end)
+  self.dispatcher:subscribe(EVENTS.delete_nuiterm, function(arg)
+    self:DeleteTerm(arg)
+  end)
+  self.dispatcher:subscribe(EVENTS.next_terminal, function(_)
+    self:NextTerm()
+  end)
+  self.dispatcher:subscribe(EVENTS.prev_terminal, function(_)
+    self:PrevTerm()
+  end)
+  self.dispatcher:subscribe(EVENTS.goto_terminal, function(arg)
+    self:ToTerm(arg)
+  end)
+  self.dispatcher:subscribe(EVENTS.term_resizing, function(args)
+    self:OnTermResize(args)
+  end)
+  self.dispatcher:subscribe(EVENTS.user_resizing, function(data)
+    self:Resize(data)
+  end)
+  self.dispatcher:subscribe(EVENTS.rename_setup, function(_)
+    self:RenameStart()
+  end)
+  self.dispatcher:subscribe(EVENTS.rename_finish, function(args)
+    self:RenameFinish(args)
+  end)
+end
+
+-- function MainWindow:new(winConfig, tabBarConfig)
+--   if not winConfig then
+--     error("MainWindow:new --> Window Configuration for MainWindow cannot be nil", 2)
+--   end
+--   if not tabBarConfig then
+--     error("MainWindow:new --> TabBar Configuration for MainWindow cannot be nil", 2)
+--   end
+--   local obj       = setmetatable({}, { __index = self })
+--   obj.nsid        = vim.api.nvim_create_namespace("NuiTerm")
+--   obj.winConfig   = winConfig
+--   obj.tabBar      = TabBar:New(
+--     tabBarConfig,
+--     function(idx)
+--       self:ShowTerminal(idx)
+--     end
+--   )
+--   obj.termWindows = {}
+--   return obj
+-- end
+
+function MainWindow:PushIds()
+  self.dispatcher:emit(
+    EVENTS.update_current_winid,
+    self.termWindows[self.currentTermID].winid
   )
-  obj.termWindows = {}
-  return obj
+  self.dispatcher:emit(
+    EVENTS.update_current_bufnr,
+    self.termWindows[self.currentTermID].bufnr
+  )
 end
 
 function MainWindow:CreateNewTerm()
@@ -83,6 +111,16 @@ function MainWindow:CreateNewTerm()
   self.totalTerms = #self.termWindows
   self.currentTermID = newTermID
   return newTermID
+end
+
+function MainWindow:NewTerm()
+  if self.currentTermID then
+    self.termWindows[self.currentTermID]:Hide()
+  end
+  local newTerm = self:CreateNewTerm()
+  self:ShowTerminal(newTerm)
+  self:PushIds()
+  self:UpdateTabBar()
 end
 
 function MainWindow:ShowTerminal(id)
@@ -103,24 +141,16 @@ function MainWindow:ShowTerminal(id)
     fg = "#FFFFF0"
   })
   vim.defer_fn(function()
-    vim.api.nvim_win_set_cursor(winid, {4, 4})
-  end,200)
+    vim.api.nvim_win_set_cursor(winid, { 4, 4 })
+  end, 200)
+  self:PushIds()
   self.winid = winid
 end
 
 function MainWindow:Show()
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
-  -- if not self.stateChanging then
-  --   self:TermMode()
-  -- end
   self.showing = true
-  self:OnResize()
-  self:CtrlMode()
-end
-
-function MainWindow:CtrlMode()
-
 end
 
 function MainWindow:Hide()
@@ -131,50 +161,36 @@ function MainWindow:Hide()
     return
   end
   currentTerm:Hide()
-  self.tabBar:Hide()
   self.winid   = nil
   self.showing = false
-
-  vim.api.nvim_del_autocmd(self.resizeCmdID)
+  -- vim.api.nvim_del_autocmd(self.resizeCmdID)
 end
 
-function MainWindow:ReloadUI()
-  self:Hide()
-  self:Show()
-end
-
-function MainWindow:Toggle()
-  if not self.showing then
-    self:Show()
-  else
-    self:Hide()
-  end
-end
-
-function MainWindow:NewTerm()
-  if self.currentTermID then
-    self.termWindows[self.currentTermID]:Hide()
-  end
-  local newTerm = self:CreateNewTerm()
-  self:ShowTerminal(newTerm)
-  self:UpdateTabBar()
-end
+-- function MainWindow:Toggle()
+--   if not self.showing then
+--     self:Show()
+--   else
+--     self:Hide()
+--   end
+-- end
+--
 
 --TODO: when deleting a term window, term_id+1's shell instance is cloned from term_id-1 ...?
 function MainWindow:DeleteTerm(term_id)
   if not term_id then term_id = self.currentTermID end
-  self:Hide()
+  self.dispatcher:emit(EVENTS.hide_nuiterm, nil)
   if self.totalTerms == 1 then
     self.termWindows   = {}
     self.totalTerms    = 0
     self.currentTermID = nil
     self.initialized   = false
+    self.dispatcher:emit(EVENTS.exit_nuiterm, nil)
     return
   end
   self.stateChanging = true
 
   local terms = self.termWindows
-  local left,right = {},{}
+  local left, right = {}, {}
 
   for i = 1, self.totalTerms do
     if i < term_id then
@@ -192,10 +208,11 @@ function MainWindow:DeleteTerm(term_id)
     table.insert(self.termWindows, t)
   end
   if term_id == self.totalTerms then
-    self.currentTermID = self.currentTermID-1
+    self.currentTermID = self.currentTermID - 1
   end
 
-  self.totalTerms = self.totalTerms-1
+  self.totalTerms = self.totalTerms - 1
+  self:PushIds()
   self:Show()
   self.stateChanging = false
 end
@@ -206,6 +223,7 @@ function MainWindow:ToTerm(term_id)
   end
   self.termWindows[self.currentTermID]:Hide()
   self.currentTermID = term_id
+  self:PushIds()
   self:ShowTerminal(term_id)
   self:UpdateTabBar()
 end
@@ -215,6 +233,7 @@ function MainWindow:NextTerm()
     self.termWindows[self.currentTermID]:Hide()
   end
   self.currentTermID = (self.currentTermID % self.totalTerms) + 1
+  self:PushIds()
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
 end
@@ -224,10 +243,10 @@ function MainWindow:PrevTerm()
     self.termWindows[self.currentTermID]:Hide()
   end
   self.currentTermID = (self.currentTermID - 2 + self.totalTerms) % self.totalTerms + 1
+  self:PushIds()
   self:ShowTerminal(self.currentTermID)
   self:UpdateTabBar()
 end
-
 
 function MainWindow:TermMode()
   self.resize = false
@@ -237,7 +256,7 @@ function MainWindow:TermMode()
   vim.api.nvim_win_set_hl_ns(self.winid, self.nsid)
   vim.api.nvim_set_hl(self.nsid, "FloatBorder", {
     blend = 90,
-    fg="#FAAAA0",
+    fg = "#FAAAA0",
   })
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("i", true, true, true), 'n', true)
 end
@@ -246,12 +265,12 @@ function MainWindow:NormMode()
   vim.api.nvim_win_set_hl_ns(self.winid, self.nsid)
   vim.api.nvim_set_hl(self.nsid, "FloatBorder", {
     blend = 00,
-    fg="#FFFFF0",
+    fg = "#FFFFF0",
   })
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, true, true), 'n', true)
 end
 
-function MainWindow:GetTabNames()
+function MainWindow:GetTermNames()
   local names = {}
   for i = 1, self.totalTerms do
     table.insert(names, self.termWindows[i].name)
@@ -259,8 +278,19 @@ function MainWindow:GetTabNames()
   return names
 end
 
+function MainWindow:UpdateUI()
+  self:Hide()
+  self.dispatcher:emit(EVENTS.hide_nuiterm, nil)
+  self:Show()
+  self.dispatcher:emit(EVENTS.show_nuiterm, nil)
+end
+
 function MainWindow:UpdateTabBar()
-  self.tabBar:SetTabs(self:GetTabNames(), self.currentTermID, self.winid)
+  self.dispatcher:emit(EVENTS.update_tab_bar, {
+    tabNames      = self:GetTermNames(),
+    currentTermID = self.currentTermID,
+    currentWinid  = self.winid,
+  })
 end
 
 --- TuiTerm Resizing ---
@@ -277,49 +307,71 @@ function MainWindow:Resize(arg)
     term:UpdateConfig(self.winConfig)
   end
   self:Hide()
-  self.tabBar:UpdateRow(arg, false)
+  -- self.tabBar:UpdateRow(arg, false)
   self:Show()
   self.stateChanging = false
 end
 
-function MainWindow:OnResize()
-  self.resizeCmdID = vim.api.nvim_create_autocmd("VimResized", {
-    callback = function()
-      vim.defer_fn(function()
-        self:NormMode()
-        self:Hide()
-        local width, winCol, tabCol = Utils.ResizeAndPosition()
-        self.winConfig.width  = width
-        self.winConfig.col = winCol
+---@param args table
+function MainWindow:OnTermResize(args)
+  vim.defer_fn(function()
+    self:NormMode()
+    self:Hide()
+    local width = args.width
+    local winCol = args.winCol
+    self.winConfig.width        = width
+    self.winConfig.col          = winCol
 
-        for _, term in pairs(self.termWindows) do
-          term:UpdateConfig(self.winConfig)
-        end
-        self.tabBar:UpdateCol(tabCol, true)
-        self.tabBar:UpdateWidth(width)
-        self:Show()
-      end, 400)
+    for _, term in pairs(self.termWindows) do
+      term:UpdateConfig(self.winConfig)
     end
-  })
+    self:Show()
+  end, 400)
 end
 
-function MainWindow:Rename()
+function MainWindow:RenameStart()
+  log("Starting Rename Proceedure", "RenameStart")
   if not self.showing then
     print("NuiTerm is not active")
     return
   end
   Keymaps.RemoveTermKeymaps(self.termWindows[self.currentTermID].bufnr)
-  self.tabBar:Rename(
-    self.winid,
-    self.winConfig.height,
-    self.currentTermID,
-    function(newName)
-      self.termWindows[self.currentTermID].name = newName
-      self:ReloadUI()
-      self:NormMode()
-    end
-  )
-  Keymaps.AddTermKeyMaps(self.termWindows[self.currentTermID].bufnr)
+  self.dispatcher:emit(EVENTS.rename_start, {
+    termWinid    = self.termWindows[self.currentTermID].winid,
+    nuiWinid     = vim.api.nvim_get_current_win(),
+    nuiWinHeight = self.winConfig.height,
+    nuiWinWidth  = self.winConfig.width,
+    terminalID   = self.currentTermID,
+  })
 end
+
+function MainWindow:RenameFinish(newName)
+  log("Ending Rename Proceedure", "RenameStart")
+  if not newName then
+    error("args is nil", 1)
+  end
+  self.termWindows[self.currentTermID].name = newName
+  Keymaps.AddTermKeyMaps(self.termWindows[self.currentTermID].bufnr)
+  self.dispatcher:emit(EVENTS.update_ui, nil)
+end
+
+-- function MainWindow:Rename()
+--   if not self.showing then
+--     print("NuiTerm is not active")
+--     return
+--   end
+--   Keymaps.RemoveTermKeymaps(self.termWindows[self.currentTermID].bufnr)
+--   self.tabBar:Rename(
+--     self.winid,
+--     self.winConfig.height,
+--     self.currentTermID,
+--     function(newName)
+--       self.termWindows[self.currentTermID].name = newName
+--       self:UpdateUI()
+--       self:NormMode()
+--     end
+--   )
+--   Keymaps.AddTermKeyMaps(self.termWindows[self.currentTermID].bufnr)
+-- end
 
 return MainWindow

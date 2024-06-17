@@ -1,56 +1,24 @@
 --> NuiTerm/init.lua
 --
-local NuiTerm         = require("NuiTerm.UI.MainWindow")
-local UserKeyCommands = require("NuiTerm.Keymap.userCmds")
-local NuiTermSetup    = require("NuiTerm.setup")
-local NTEventDispatcher = require("NuiTerm.Events.EventDispatcher").NTEventDispatcher
+local NTEventController = require("NuiTerm.Events.EventController")
 
 local M = {}
-M.keyMaps = NuiTermSetup.keyMaps
 
 M.setup = function(opts)
-  M.keyMaps = opts.user_keymaps
-  NuiTermSetup.setup(opts)
-  local winConfig = NuiTermSetup.WindowConfig(opts.win_config)
-  if not winConfig.relative then
-    error("Relative is missing", 2)
-  end
+  print("SETUP")
+  local eventController = NTEventController:new(opts)
+  eventController:PushSubscriptions()
+  eventController:GlobalAutoCmds()
+  eventController:SetupUserCmds()
 
-  local tabBarConfig = NuiTermSetup.TabBarConfig(opts.win_config)
-
-  M.MainWindow = NuiTerm:new(winConfig, tabBarConfig)
-
-  vim.keymap.set(
-    'n',
-    M.keyMaps.nuiterm_toggle,
-    function()
-      M.MainWindow:Toggle()
-    end,
-    {
-      noremap = true,
-      silent  = true,
-    }
-  )
-  vim.keymap.set(
-    'n',
-    M.keyMaps.new_term,
-    function()
-      M.MainWindow:NewTerm()
-    end,
-    {
-      noremap = true,
-      silent  = true,
-    }
-  )
+  M.eventController = eventController
 end
 
 M.Expand = function()
-  M.MainWindow:Resize(NuiTermSetup.keyMaps.term_resize.expand.amt)
+  error("NuiTerm Expand needs implemented! Remember to update keymap/term.lua keymap")
 end
 M.Shrink = function()
-  M.MainWindow:Resize(NuiTermSetup.keyMaps.term_resize.shrink.amt)
+  error("NuiTerm Shrink needs implemented! Remember to update keymap/term.lua keymap")
 end
-
-UserKeyCommands.UserCommandSetup(M)
 
 return M

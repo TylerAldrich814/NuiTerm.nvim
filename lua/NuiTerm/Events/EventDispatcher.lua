@@ -12,47 +12,64 @@ local log = require("NuiTerm.Debug").LOG_FN("NTEvent", {
 
 ---@enum nuiterm.events
 local EVENTS = {
+  -- toggle_nuiterm =  0,
   show_nuiterm   =  1,
   hide_nuiterm   =  2,
-  rename_nuiterm =  3,
-  delete_nuiterm =  4,
-  goto_terminal  =  5,
-  new_terminal   =  6,
-  next_terminal  =  7,
-  prev_terminal  =  8,
+  exit_nuiterm  =  3,
 
-  term_sizing    =  9,
-  term_ui_update = 10,
+  rename_setup   =  4,
+  rename_start   =  5,
+  rename_finish  =  6,
+
+  delete_nuiterm =  7,
+  goto_terminal  =  8,
+  new_terminal   =  9,
+  next_terminal  = 10,
+  prev_terminal  = 11,
+
+  user_resizing  = 12,
+  term_resizing  = 13,
+  update_ui      = 14,
+
+  update_tab_bar = 15,
+
+  update_current_winid = 16,
+  update_current_bufnr = 17,
+  get_current_winid    = 18,
+  get_current_bufnr    = 19,
 }
-
----@alias DispatchCallback function<string|number|table|boolean>
----@alias Listeners table<number, DispatchCallback>
+---@param value number
+local function db_event_str(value)
+  for k, v in pairs(EVENTS) do
+    if v == value then
+      return k
+    end
+  end
+  return nil
+end
 
 ---@class NTEventDispatcher
----@field listeners Listeners
 local NTEventDispatcher = {}
 
 function NTEventDispatcher:new()
-  local obj = {
-    listeners = {}
-  }
-  setmetatable(obj, self)
+  local obj = setmetatable({
+    listeners = {},
+  }, {__index = self})
+
   return obj
 end
 
 --- Subscribes a NuiTerm Component into NuiTerms Global EventSystem
 --- Dispatcher.
----@param eventType nuiterm.events
----@param listener  any
 function NTEventDispatcher:subscribe(eventType, listener)
-  if not self.subscribe[eventType] then
-    self.subscribe[eventType] = {}
+
+  log("Event: ".. db_event_str(eventType) .. "[ "..eventType.. " ]", "subscribe")
+  if not self.listeners[eventType] then
+    self.listeners[eventType] = {}
   end
   table.insert(self.listeners[eventType], listener)
 end
 
----@param eventType nuiterm.events
----@param listener  any
 function NTEventDispatcher:unsubscribe(eventType, listener)
   if not self.listeners[eventType] then return end
   for i, l in ipairs(self.listeners[eventType]) do
@@ -63,9 +80,16 @@ function NTEventDispatcher:unsubscribe(eventType, listener)
   end
 end
 
----@param eventType nuiterm.events
----@param data      any
 function NTEventDispatcher:emit(eventType, data)
+  if eventType == EVENTS.rename_setup then
+    log("rename_setup", "emit")
+  end
+  if eventType == EVENTS.rename_start then
+    log("rename_start", "emit")
+  end
+  if eventType == EVENTS.rename_finish then
+    log("rename_finish", "emit")
+  end
   if not self.listeners[eventType] then return end
   for _, listener in ipairs(self.listeners[eventType]) do
     listener(data)

@@ -1,8 +1,10 @@
 --> NuiTerm/TabBar/Bar.lua
 --
+local EVENTS = require("NuiTerm.Events.EventDispatcher").EVENTS
 local Tab   = require("NuiTerm.UI.TabBar.Tab")
 local fn, api, map = vim.fn, vim.api, vim.keymap.set
 local AUGROUP = api.nvim_create_augroup("NuiTermTabHover", { clear=true })
+local NuiTermRename = require("NuiTerm.UI.Rename")
 
 local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
   deactivate = false,
@@ -16,65 +18,73 @@ vim.api.nvim_set_hl(0, 'TabLineSel', { fg = '#000000', bg = '#ffffff' }) -- Cust
 --TODO: Figure out how to gracfully close the TabBar when you quit NuiTerm via ':q'&':q!'..
 
 ---@class TabBar
----@field winid      number|nil
----@field bufnr      number|nil
----@field tabs       Tab[]
----@field config     table
----@field tabConfig  table
----@field seperator  string
----@field onClick    function
-local TabBar = {
-  winid     = nil,
-  bufnr     = nil,
-  tabs      = {},
-  config    = {},
-  tabConfig = {},
-  seperator = "▎",
-}
+local TabBar = { }
 
----@param config  table
----@param onClick function
-function TabBar:NewNew(config, tabConfig, onClick)
-  if not config then
-    error("TabBarConfig is nil", 2)
+---@param dispatcher NTEventDispatcher
+---@param barConfig  table
+---@param tabConfig  table
+function TabBar:new(dispatcher, barConfig, tabConfig)
+  if not barConfig then
+    error("BarConfig is nil", 2)
   end
-  local obj = setmetatable({}, {__index = self})
-  obj.bufnr = vim.api.nvim_create_buf(false, true)
-  vim.bo[obj.bufnr].bufhidden = "hide"
-  obj.config    = config.MainBar
-  obj.tabConfig = config.Tab
-  obj.onClick   = onClick
+  if not tabConfig then
+    error("TabConfig is nil", 2)
+  end
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  vim.bo[bufnr].bufhidden = "hide"
+  local obj = setmetatable({
+    dispatcher = dispatcher,
+    nuiTermRename = NuiTermRename:new(dispatcher),
+    bufnr     = bufnr,
+    winid     = nil,
+    tabs      = {},
+    config    = barConfig,
+    tabConfig = tabConfig,
+    seperator = "▎",
+  }, {__index = self})
   return obj
 end
 
----@param config  table
----@param onClick function
-function TabBar:New(config, onClick)
-  if not config then
-    error("TabBarConfig is nil", 2)
-  end
-  local obj = setmetatable({}, {__index = self})
-  obj.bufnr = vim.api.nvim_create_buf(false, true)
-  vim.bo[obj.bufnr].bufhidden = "hide"
-  obj.config    = config.MainBar
-  obj.tabConfig = config.Tab
-  obj.onClick   = onClick
-  return obj
+function TabBar:PushSubscriptions()
+  self.dispatcher:subscribe(EVENTS.update_tab_bar, function(args)
+    self:SetTabs(args)
+  end)
+  self.dispatcher:subscribe(EVENTS.hide_nuiterm, function(_)
+    self:Hide()
+  end)
+  self.dispatcher:subscribe(EVENTS.rename_start, function(args)
+    self:RenameStart(args)
+  end)
+  self.dispatcher:subscribe(EVENTS.term_resizing, function(args)
+    self:OnTermResize(args)
+  end)
 end
 
----@param termTabs   string[]
----@param focusedIdx number
----@param mainWinId  number
-function TabBar:SetTabs(termTabs, focusedIdx, mainWinId)
+function TabBar:SetTabs(args)
+  if not args then
+    error("Args is nil")
+  end
+  local tabNames      = args.tabNames
+  local currentTermID = args.currentTermID
+  local currentWinid  = args.currentWinid
+  if not tabNames then
+    error("tabNames is nil")
+  end
+  if not currentTermID then
+    error("currentTermID is nil")
+  end
+  if not currentWinid then
+    error("currentWinid is nil")
+  end
   self:Hide()
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
   local col    = 1
   local width  = self.tabConfig.width
   local height = self.tabConfig.height
 
-  for i, tabName in ipairs(termTabs) do
+  for i, tabName in ipairs(tabNames) do
     local tab
-    tab = Tab:New(i, tabName, col, width, height, mainWinId)
+    tab = Tab:new(i, tabName, col, width, height, currentWinid)
     table.insert(self.tabs, tab)
     col = col + width
   end
@@ -85,7 +95,7 @@ function TabBar:SetTabs(termTabs, focusedIdx, mainWinId)
 
   for i, tab in ipairs(self.tabs) do
     local group = "TabLine"
-    if i == focusedIdx then group = "TabLineSel" end
+    if i == currentTermID then group = "TabLineSel" end
     tab:Highlight(group)
   end
 
@@ -154,6 +164,14 @@ function TabBar:setupOnHover()
       end
     end
   })
+end
+
+---@param args table
+function TabBar:OnTermResize(args)
+  local tabCol = args.tabCol
+  local width  = args.width
+  self:UpdateCol(tabCol, true)
+  self:UpdateWidth(width)
 end
 
 --- If 'abs' is true, then we update our row positions relativly with our original values.
@@ -227,6 +245,34 @@ local function RenameOnEnterCallback(renameBufnr, callback, cleanup)
   })
 end
 
+function TabBar:RenameStart(args)
+  log("Starting Rename Proceedure", "RenameStart")
+  if not args or type(args) ~= "table" then
+    error("Args in either nil or not a table", 1)
+  elseif not args.termWinid or type(args.termWinid) ~= "number" then
+    error("args.termWinid in either nil or not a table", 1)
+  elseif not args.nuiWinid or type(args.nuiWinid) ~= "number" then
+    error("args.nuiWinid in either nil or not a table", 1)
+  elseif not args.nuiWinHeight or type(args.nuiWinHeight) ~= "number" then
+    error("args.nuiWinHeight in either nil or not a table", 1)
+  elseif not args.nuiWinWidth or type(args.nuiWinWidth) ~= "number" then
+    error("args.nuiWinWidth in either nil or not a table", 1)
+  elseif not args.terminalID or type(args.terminalID) ~= "number" then
+    error("args.terminalID in either nil or not a table", 1)
+  elseif not self.tabs[args.terminalID] then
+    error("args.terminalID is out of bounds. No Tab matching this index", 1)
+  end
+  log("Calling nuiTermRename:Activate", "RenameStart")
+  self.nuiTermRename:Activate({
+    termWinid    = args.termWinid,
+    nuiWinid     = args.nuiWinid,
+    nuiWinHeight = args.nuiWinHeight,
+    nuiWinWidth  = args.nuiWinWidth,
+    tabWidth     = self.tabConfig.width+10,
+    currentTab   = self.tabs[args.terminalID]
+  })
+end
+
 ---@param mainWinId      number
 ---@param mainWinHeight  number
 ---@param termID         number
@@ -235,9 +281,11 @@ function TabBar:Rename(mainWinId, mainWinHeight, termID, renameCallback)
   local curTab     = self.tabs[termID]
   local renameText = " Rename: "
   local currentWin = api.nvim_get_current_win()
+
   local tabWidth   = self.tabConfig.width+10
   local tabHeight  = 1
   local termWidth  = self.tabConfig.nuiWidth
+
   local center     = math.floor(termWidth/2)
   if center % 2 == 1 then center = center-1 end
   local renamePopupWidth = tabWidth+#renameText
@@ -247,7 +295,7 @@ function TabBar:Rename(mainWinId, mainWinHeight, termID, renameCallback)
     win      = mainWinId,
     width    = 10,
     height   = tabHeight,
-    style    = "minimal",
+    style    ="minimal",
     border   = "rounded",
     row      = mainWinHeight,
     col      = center-math.floor(renamePopupWidth/2)-#renameText
