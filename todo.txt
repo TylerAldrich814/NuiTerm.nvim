@@ -4,3 +4,11 @@
  - I like Oil's Help screen menu via 'g?'
    Maybe do something similar? i.e., 't?'
    Where We bring up a Keymap Helper window?
+
+ - MainWindow Padding - Add UI feature to have padding between inner MainWindow
+   and TermWindow.
+    This could be implemented by taking the padding values and caculating TermWindow's
+    width,height,row,col based on MainWindows width,height,row,col then passing said 
+    values into termConfig.
+   Reason: The TabBar is too damn close to the termwindow -- This could look a lot better.
+    

@@ -15,14 +15,14 @@ local DebugConfig = {
   row = 0,
   col = vim.o.columns - 103,
   border = "rounded",
-  focusable = true,
+  focusable = not false,
 };
 
 local M = {}
 
 M.FirstInit = true;
 M.Messages = {}
-M.StayClosed = true;
+M.StayClosed = not true;
 
 vim.keymap.set('n', '<leader>td', function() M.ToggleDebug() end, { noremap = true, silent = true})
 
@@ -65,8 +65,8 @@ function M.create_or_get_debug_window()
   -- Create a new buffer if it doesn't exist
   if not debug_bufnr or not vim.api.nvim_buf_is_valid(debug_bufnr) then
     debug_bufnr = vim.api.nvim_create_buf(false, true)
-    vim.bo[debug_bufnr].bufhidden = "wipe"
-    vim.bo[debug_bufnr].filetype = "debug"  -- Optional: Set a custom filetype
+    vim.bo[debug_bufnr].bufhidden  = "wipe"
+    vim.bo[debug_bufnr].filetype   = "debug"  -- Optional: Set a custom filetype
   end
 
   -- Create the floating window
@@ -96,7 +96,9 @@ function M.Push(msg)
   if not BufCheck()then
     return
   end
-  vim.api.nvim_buf_set_lines(debug_bufnr, -1, -1, false, {msg})
+  if debug_bufnr then
+    vim.api.nvim_buf_set_lines(debug_bufnr, -1, -1, false, {msg})
+  end
 end
 
 -- Push a message to the debug window
@@ -108,7 +110,9 @@ function M.push_message(source, msg)
   if not BufCheck()then
     return
   end
-  vim.api.nvim_buf_set_lines(debug_bufnr, -1, -1, false, {message})
+  if debug_bufnr then
+    vim.api.nvim_buf_set_lines(debug_bufnr, -1, -1, false, {message})
+  end
 end
 
 -- Log Funciton Factory
@@ -120,12 +124,12 @@ end
 --    ..
 --    log("Something Happened", "SomeFunc")
 function M.LOG_FN(SOURCE, opts)
-
   return function(msg, src)
     local source = SOURCE
     if src then
       source = source .. ":" .. src
     end
+    if M.StayClosed then return end
     if opts then
       if opts.deactivate then
         return

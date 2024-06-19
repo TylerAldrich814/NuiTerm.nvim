@@ -52,7 +52,7 @@ M.MergeConfigs = function(defaults, overrides)
     elseif type(overrides[k]) ~= 'table' then
       error("Keymap: \""..k.." should be a table")
     end
-    overrides[k] = M.NergeConfigs(v, overrides[k])
+    overrides[k] = M.MergeConfigs(v, overrides[k])
     ::continue::
   end
   return overrides

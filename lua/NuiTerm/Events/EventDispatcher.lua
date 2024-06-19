@@ -7,7 +7,7 @@
 -- We connect all of the UI components TO NTEvent instead of connecting everything to MainWindow.
 -- Doing it this way will open the doors for more Features and more customizaiton.
 local log = require("NuiTerm.Debug").LOG_FN("NTEvent", {
-  deavative = false
+  deavatived = true
 })
 
 ---@enum nuiterm.events
@@ -62,8 +62,6 @@ end
 --- Subscribes a NuiTerm Component into NuiTerms Global EventSystem
 --- Dispatcher.
 function NTEventDispatcher:subscribe(eventType, listener)
-
-  log("Event: ".. db_event_str(eventType) .. "[ "..eventType.. " ]", "subscribe")
   if not self.listeners[eventType] then
     self.listeners[eventType] = {}
   end
@@ -81,15 +79,6 @@ function NTEventDispatcher:unsubscribe(eventType, listener)
 end
 
 function NTEventDispatcher:emit(eventType, data)
-  if eventType == EVENTS.rename_setup then
-    log("rename_setup", "emit")
-  end
-  if eventType == EVENTS.rename_start then
-    log("rename_start", "emit")
-  end
-  if eventType == EVENTS.rename_finish then
-    log("rename_finish", "emit")
-  end
   if not self.listeners[eventType] then return end
   for _, listener in ipairs(self.listeners[eventType]) do
     listener(data)

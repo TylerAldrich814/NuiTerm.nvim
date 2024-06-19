@@ -8,7 +8,13 @@ Defaults.winConfig = function()
     height   = 20,
     position = "bottom",
     style    = "minimal",
-    border   = "rounded"
+    border   = "rounded",
+    padding  = {
+      top    = 3,
+      bottom = 2,
+      left   = 4,
+      right  = 4,
+    }
   }
 end
 
@@ -33,10 +39,10 @@ end
 ---@param width number
 Defaults.tabConfig = function(col, row, width)
   return {
-    col    = col,
-    row    = row,
-    width  = 25,
-    height = 1,
+    col      = col,
+    row      = row,
+    width    = 20,
+    height   = 1,
     nuiWidth = width
   }
 end
@@ -60,7 +66,7 @@ Defaults.RenameInputConfig = function()
   return {
     relative = "win",
     win      = nil,
-    width    = 35,
+    width    = 40,
     height   = 1,
     style    = "minimal",
     border   = "rounded",
@@ -70,7 +76,7 @@ Defaults.RenameInputConfig = function()
 end
 
 Defaults.keymaps = function()
-  return  {
+  return {
     change_mode    = "<Esc>",
     rename_term    = "<leader>tr",
     nuiterm_toggle = "<leader>tt",

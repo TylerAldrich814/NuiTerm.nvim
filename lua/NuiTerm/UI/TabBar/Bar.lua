@@ -10,8 +10,6 @@ local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
   deactivate = false,
 })
 
-vim.api.nvim_set_hl(0, 'TabLine', { fg = '#ffffff', bg = '#000000' }) -- Customize colors as needed
-vim.api.nvim_set_hl(0, 'TabLineSel', { fg = '#000000', bg = '#ffffff' }) -- Customize colors as needed
 
 ------------------------ TabBar ------------------------ 
 -------------------------------------------------------
@@ -19,7 +17,6 @@ vim.api.nvim_set_hl(0, 'TabLineSel', { fg = '#000000', bg = '#ffffff' }) -- Cust
 
 ---@class TabBar
 local TabBar = { }
-
 ---@param dispatcher NTEventDispatcher
 ---@param barConfig  table
 ---@param tabConfig  table
@@ -76,28 +73,45 @@ function TabBar:SetTabs(args)
   if not currentWinid then
     error("currentWinid is nil")
   end
-  self:Hide()
+  if #self.tabs ~= 0 then
+    self:Hide()
+  end
+  self.tabs = {}
   self.winid = vim.api.nvim_open_win(self.bufnr, false, self.config)
   local col    = 1
   local width  = self.tabConfig.width
   local height = self.tabConfig.height
 
+  log(" -------")
   for i, tabName in ipairs(tabNames) do
-    local tab
-    tab = Tab:new(i, tabName, col, width, height, currentWinid)
+    local tab = Tab:new(
+      i,
+      tabName,
+      col,
+      width,
+      height,
+      currentWinid,
+      #tabNames,
+      i == currentTermID
+    ):Display()
+
     table.insert(self.tabs, tab)
     col = col + width
   end
+  log(" -------")
 
-  for _, tab in ipairs(self.tabs) do
-    tab:Display( self.onClick )
-  end
+  -- for i, tab in ipairs(self.tabs) do
+  --   local group = "TabLine"
+  --   if i == currentTermID then group = "TabLineSel" end
+    -- tab:Display(self.onClick, group, total_tabs)
+  --   tab:Display()
+  -- end
 
-  for i, tab in ipairs(self.tabs) do
-    local group = "TabLine"
-    if i == currentTermID then group = "TabLineSel" end
-    tab:Highlight(group)
-  end
+  -- for i, tab in ipairs(self.tabs) do
+  --   local group = "TabLine"
+  --   if i == currentTermID then group = "TabLineSel" end
+  --   tab:Highlight(group)
+  -- end
 
   vim.api.nvim_buf_set_keymap(
     self.bufnr,
@@ -206,45 +220,6 @@ function TabBar:UpdateWidth(width)
   self.config.width = width
 end
 
----@ RENAMING Functions <---
-
----@param renameBufnr number
----@param callback    function
----@param cleanup     function
-local function RenameOnEnterCallback(renameBufnr, callback, cleanup)
-  local function onLeave()
-    cleanup()
-  end
-  local function onHitEnter()
-    local newName = api.nvim_buf_get_lines(renameBufnr, 0, 1, false)[1]
-    onLeave()
-    callback(newName)
-  end
-  api.nvim_buf_set_keymap(renameBufnr, 'i', '<CR>', '', {
-    noremap  = true,
-    silent   = true,
-    callback = onHitEnter
-  })
-  api.nvim_buf_set_keymap(renameBufnr, 'n', '<CR>', '', {
-    noremap  = true,
-    silent   = true,
-    callback = onHitEnter
-  })
-  api.nvim_buf_set_keymap(renameBufnr, 'n', '<Esc>', '', {
-    noremap  = true,
-    silent   = true,
-    callback = onLeave,
-  })
-
-  api.nvim_create_autocmd({"WinLeave", "BufLeave"}, {
-    buffer = renameBufnr,
-    callback = function()
-      onLeave()
-    end,
-    once = true
-  })
-end
-
 function TabBar:RenameStart(args)
   log("Starting Rename Proceedure", "RenameStart")
   if not args or type(args) ~= "table" then
@@ -272,81 +247,5 @@ function TabBar:RenameStart(args)
     currentTab   = self.tabs[args.terminalID]
   })
 end
-
----@param mainWinId      number
----@param mainWinHeight  number
----@param termID         number
----@param renameCallback function  
-function TabBar:Rename(mainWinId, mainWinHeight, termID, renameCallback)
-  local curTab     = self.tabs[termID]
-  local renameText = " Rename: "
-  local currentWin = api.nvim_get_current_win()
-
-  local tabWidth   = self.tabConfig.width+10
-  local tabHeight  = 1
-  local termWidth  = self.tabConfig.nuiWidth
-
-  local center     = math.floor(termWidth/2)
-  if center % 2 == 1 then center = center-1 end
-  local renamePopupWidth = tabWidth+#renameText
-
-  local renameSignOpts = {
-    relative = "win",
-    win      = mainWinId,
-    width    = 10,
-    height   = tabHeight,
-    style    ="minimal",
-    border   = "rounded",
-    row      = mainWinHeight,
-    col      = center-math.floor(renamePopupWidth/2)-#renameText
-  }
-  local renameWindowOpts = {
-    relative = "win",
-    win      = mainWinId,
-    width    = tabWidth+10,
-    height   = tabHeight,
-    style    = "minimal",
-    border   = "rounded",
-    row      = mainWinHeight,
-    col      = center-math.floor(renamePopupWidth/2)
-  }
-  local renameSignBuf    = api.nvim_create_buf(false, true)
-  local renameWindowBuf  = api.nvim_create_buf(false, true)
-
-  local renameSign = api.nvim_open_win(renameSignBuf, false, renameSignOpts)
-  local renameWindow = api.nvim_open_win(renameWindowBuf, true, renameWindowOpts)
-
-  api.nvim_buf_set_lines(renameWindowBuf, 0, -1, false, {curTab.name})
-  api.nvim_buf_set_lines(renameSignBuf, 0, -1, true, {renameText})
-
-  vim.bo[renameSignBuf].modifiable  = false
-  vim.bo[renameWindowBuf].bufhidden = "wipe"
-  vim.bo[renameSignBuf].bufhidden   = "wipe"
-
-  api.nvim_win_set_cursor(renameWindow,{ 1, #curTab.name+1 })
-  api.nvim_feedkeys('a', 'i', true)
-
-  RenameOnEnterCallback(renameWindowBuf,
-    function(newName)
-      renameCallback(newName)
-    end,
-    function()
-      if api.nvim_win_is_valid(renameSign) then
-        api.nvim_win_close(renameSign, true)
-      end
-      if api.nvim_win_is_valid(renameWindow) then
-        api.nvim_win_close(renameWindow, true)
-      end
-      if api.nvim_buf_is_valid(renameSignBuf) then
-        api.nvim_buf_delete(renameSignBuf, { force = false } )
-      end
-      if api.nvim_buf_is_valid(renameWindowBuf) then
-        api.nvim_buf_delete(renameWindowBuf, { force = true})
-      end
-      api.nvim_win_set_cursor(currentWin, {4, 3})
-    end
-  )
-end
-
 
 return TabBar

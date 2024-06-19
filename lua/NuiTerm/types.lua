@@ -43,21 +43,27 @@
 
 
 ---@class NTConfigHandler
+---@field opts    table
 ---@field window  table
 ---@field tabBar  table
 ---@field tab     table
+---@field shell   table
 ---@field keymaps table
 
 ---@class MainWindow
 ---@field dispatcher    NTEventDispatcher
----@field nsid          integer|nil
----@field winid         integer|nil
+---@field mainNsid      integer|nil
+---@field termNsid      integer|nil
+---@field mainWinid     integer|nil
+---@field mainWinBufnr  integer|nil
+---@field curTermWinid  integer|nil
 ---@field initialized   boolean
 ---@field showing       boolean
 ---@field totalTerms    number
 ---@field currentTermID number|nil
 ---@field termWindows   TermWindow[]
 ---@field winConfig     table
+---@field shellConfig   table
 ---@field resizeCmdID   number|nil
 ----@field New               fun(dispatcher: NTEventDispatcher, winConfig: table): MainWindow
 ---@field PushSubscriptions fun(self: MainWindow): nil
@@ -98,23 +104,23 @@
 ---@field IsBufValid   fun(self: TermWindow): boolean
 ---@field OnHoverOver  fun(self: TermWindow, curent: number): nil
 ---@field RecreateBuf  fun(self: TermWindow): nil
----@field SpawnShell   fun(self: TermWindow, onLeave: function): nil
----@field Show         fun(self: TermWindow, onLeave: function): number
+---@field SpawnShell   fun(self: TermWindow): nil
+---@field Show         fun(self: TermWindow): number
 ---@field Hide         fun(self: TermWindow): nil
 ---@field Delete       fun(self: TermWindow): nil
 ---@field UpdateConfig fun(self: TermWindow, config: table): nil
 
 
 ---@class TabBar
----@field dispatcher NTEventDispatcher
+---@field dispatcher    NTEventDispatcher
 ---@field nuiTermRename NuiTermRename
----@field winid      number|nil
----@field bufnr      number|nil
----@field tabs       Tab[]
----@field config     table
----@field tabConfig  table
----@field seperator  string
----@field onClick    function
+---@field winid         number|nil
+---@field bufnr         number|nil
+---@field tabs          Tab[]
+---@field config        table
+---@field tabConfig     table
+---@field seperator     string
+---@field onClick       function
 ---@field PushSubscriptions fun(self: TabBar): nil
 ---@field SetTabs           fun(self: TabBar, args: EmitData): nil
 ---@field Hide              fun(self: TabBar): nil

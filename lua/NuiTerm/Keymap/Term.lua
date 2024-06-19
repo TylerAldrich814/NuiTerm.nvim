@@ -25,32 +25,16 @@ M.AddTermKeyMaps = function(bufnr)
   -- Mode Keymaps
   --- If in 'terminal' mode, Hitting <Esc> will call MainWindow:NormMode -- Putting you into Normal Mode
   -- [[<cmd>lua require('NuiTerm').MainWindow:NormMode()<CR>]],
+  local opts = { noremap=true, silent=true }
+
   api.nvim_buf_set_keymap(
     bufnr,
     't',
     '<Esc>',
     [[<cmd>lua require('NuiTerm').eventController.nuiTermWindow:NormMode()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
 
-  -- api.nvim_buf_set_keymap(
-  --   bufnr,
-  --   "i",
-  --   "<LeftDrag>",
-  --   "<nop>",
-  --   { noremap = true, silent = true }
-  -- )
-  -- api.nvim_buf_set_keymap(
-  --   bufnr,
-  --   "i",
-  --   "<LeftRelease>",
-  --   "<nop>",
-  --   { noremap = true, silent = true }
-  -- )
-  --
   local insert_commands = { "i", "<S-i>", "a", "<S-a>" }
   -- If in 'Normal' mode, Hitting 'i' will call MainWindow:TermMode -- Putting you into TerminalMode
   for _, cmd in ipairs(insert_commands) do
@@ -59,10 +43,7 @@ M.AddTermKeyMaps = function(bufnr)
       'n',
       cmd,
       [[<cmd>lua require('NuiTerm').eventController.nuiTermWindow:TermMode()<CR>]],
-      {
-        noremap = true,
-        silent  = true,
-      }
+      opts
     )
   end
   -- If in 'Normal' mode, Hitting <Esc> will call MainWindow:Hide() -- Hiding the NuiTerm Window
@@ -71,10 +52,7 @@ M.AddTermKeyMaps = function(bufnr)
     'n',
     "<Esc>",
     [[<cmd>lua require('NuiTerm').eventController:Hide()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
   api.nvim_buf_set_keymap(
     bufnr,
@@ -82,30 +60,21 @@ M.AddTermKeyMaps = function(bufnr)
     -- require('NuiTerm').keyMaps.next_term,
     require('NuiTerm').eventController.ntConfigHandler.keymaps.next_term,
     [[<cmd>lua require('NuiTerm').eventController:NextTerm()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
     require('NuiTerm').eventController.ntConfigHandler.keymaps.prev_term,
     [[<cmd>lua require('NuiTerm').eventController:PrevTerm()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
   api.nvim_buf_set_keymap(
     bufnr,
     'n',
     require('NuiTerm').eventController.ntConfigHandler.keymaps.close_term,
     [[<cmd>lua require('NuiTerm').eventController:DelTerm()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
 
   local resizeCmd = { 'n', 'i' }
@@ -115,20 +84,14 @@ M.AddTermKeyMaps = function(bufnr)
       cmd,
       require('NuiTerm').eventController.ntConfigHandler.keymaps.term_resize.expand.cmd,
       [[<cmd>lua require('NuiTerm').Expand()<CR>]],
-      {
-        noremap = true,
-        silent  = true,
-      }
+      opts
     )
     api.nvim_buf_set_keymap(
       bufnr,
       cmd,
       require('NuiTerm').eventController.ntConfigHandler.keymaps.term_resize.shrink.cmd,
       [[<cmd>lua require('NuiTerm').Shrink()<CR>]],
-      {
-        noremap = true,
-        silent  = true,
-      }
+      opts
     )
   end
 
@@ -137,11 +100,20 @@ M.AddTermKeyMaps = function(bufnr)
     'n',
     require('NuiTerm').eventController.ntConfigHandler.keymaps.rename_term,
     [[<cmd>lua require('NuiTerm').eventController:Rename()<CR>]],
-    {
-      noremap = true,
-      silent  = true,
-    }
+    opts
   )
+
+  --> Deactivating unwanted commands for NuiTermBufnr
+  local uneeded = {"d", "dd", "D", "x", "X", "c", "cc", "C"}
+  for _, deactivate in pairs(uneeded) do
+    api.nvim_buf_set_keymap(
+      bufnr,
+      'n',
+      deactivate,
+      '<Nop>',
+      opts
+    )
+  end
 end
 
 ---@param bufnr number

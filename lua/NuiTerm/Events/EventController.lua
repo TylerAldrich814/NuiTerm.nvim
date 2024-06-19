@@ -8,12 +8,9 @@ local NuiTermWindow     = require("NuiTerm.UI.MainWindow")
 local TabBar            = require("NuiTerm.UI.TabBar.Bar")
 local NTConfigHandler   = require("NuiTerm.Config.Handler")
 
---TODO: Needs moved to new architecture
-local NuiTermSetup      = require("NuiTerm.setup")
 local Utils             = require("NuiTerm.utils")
-
 local log               = require("NuiTerm.Debug").LOG_FN("NTEventController", {
-  desactivated = false,
+  deactivate = true,
 })
 
 ---@class NTEventController
@@ -23,7 +20,7 @@ local NTEventController = {}
 function NTEventController:new(opts)
   local dispatcher    = NTEventDispatcher:new()
   local ntConfig      = NTConfigHandler:new(opts)
-  local nuiTermWindow = NuiTermWindow:new(dispatcher, ntConfig.window)
+  local nuiTermWindow = NuiTermWindow:new(dispatcher, ntConfig.window, ntConfig.shell)
   local nuiTermTabBar = TabBar:new(dispatcher, ntConfig.tabBar, ntConfig.tab)
   nuiTermWindow:PushSubscriptions()
   nuiTermTabBar:PushSubscriptions()
