@@ -1,5 +1,6 @@
---> Nuimerm/TabBar/Tab.lua
+--> Nuimerm/TabBar/Tab.lutabWidth
 --
+local fmt = string.format
 
 local pallet = require("NuiTerm.Theme.colors").palette
 local log = require("NuiTerm.Debug").LOG_FN("Tab", {
@@ -81,7 +82,38 @@ function Tab:new(
   return obj
 end
 
----@alias TabEnd {ch: string, length: number}
+---@class SpecialChar
+---@field char    string
+---@field dWidth  number
+---@field mWidth  number
+---@field visible boolean
+local SpecialChar = {}
+
+function SpecialChar:new(char)
+  local obj = setmetatable({
+    char    = char,
+    dWidth  = api.nvim_strwidth(char),
+    mWidth  = #char,
+    -- visible = true,
+  }, { __index = self })
+  return obj
+end
+function SpecialChar:Padding(length)
+  local padding = string.rep(" ", length)
+  local obj = setmetatable({
+    char    = padding,
+    dWidth  = #padding,
+    mWidth  = #padding,
+    -- visible = false,
+  }, { __index = self })
+  return obj
+end
+
+function SpecialChar:Debug()
+  log("\"" ..self.char .. "\""  .. " dWidth:" .. self.dWidth .. " mWidth: " .. self.mWidth)
+end
+
+---@alias TabEnd {ch: string?, length: number}
 
 ---@type TabEnd
 local rndLeft = {
@@ -93,23 +125,17 @@ local rndRight = {
   ch     =  "█",
   length = 2,
 }
----@type TabEnd
-local sepLeft = {
-  ch = "▎",
-  length = 1,
-}
----@type TabEnd
-local sepRight = {
-  ch = "",
-  length = 0
-  -- ch = "🮇",
-  -- length = 1
-}
-
 local sepCent = {
   ch = "|",
   length = 1,
 }
+
+local sep = "| "
+local rndEnds = {
+  "█","█"
+}
+
+
 
 local fgSel = pallet.autumnYellow
 local bgSel = pallet.autumnRed
@@ -126,243 +152,170 @@ vim.api.nvim_set_hl(0, 'NTTabRnd',     { fg=bg1,   bg=bg2, force=true })
 
 vim.api.nvim_set_hl(0, 'NTTabLineSep',    { fg = '#FFFFF0', bg = '#112244', force = true })
 vim.api.nvim_set_hl(0, 'NTTabLineSepSel', { fg = '#112244', bg = '#FFFFF0', force = true })
-
 vim.api.nvim_set_hl(0, "NTTabSep", { fg=fgSel, bg=bg1, force=true })
 
+---@alias TabHLData {group: string, start: number, stop: number}
+
+---@param bufnr number
+---@param hlData TabHLData[]
+function CreateTabHighlights(bufnr, hlData)
+  for _, hl in ipairs(hlData)do
+    api.nvim_buf_add_highlight(bufnr, 0, hl.group, 0, hl.start, hl.stop)
+  end
+end
+
+---@param left     SpecialChar
+---@param label    string
+---@param right    SpecialChar
+---@param tabWidth number
+local function createTabLabel(left, label, right, tabWidth)
+  local innerWidth = tabWidth - left.dWidth - right.dWidth
+  if #label >= innerWidth-2 then
+    local ellipsis = "... "
+    label = fmt("%s%s", string.sub(label, 0, innerWidth-#label-#ellipsis), ellipsis)
+  end
+  local padding  = string.rep(" ", innerWidth - #label + 2) --  (right.visible and 2 or 3))
+  local tabLabel = string.format("%s%s%s%s", left.char, label, padding, right.char)
+  return tabLabel
+end
+
+function Tab:createFocusedTab()
+  local leftChar  = SpecialChar:new("█")
+  local rightChar = SpecialChar:new("█")
+  self.config.zindex = self.config.zindex+5
+  self.config.width  = self.config.width+1
+
+  local label = createTabLabel(leftChar, self.label, rightChar, self.config.width)
+
+  self.winid = api.nvim_open_win(self.bufnr, false, self.config)
+  api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { label })
+  CreateTabHighlights(
+    self.bufnr,
+    {{
+      group = "NTTabLineSel",
+      start = 0,
+      stop = -1,
+    },
+    {
+      group = "NTTabRndSel",
+      start = 0,
+      stop = leftChar.mWidth,
+    },
+    {
+      group = "NTTabRndSel",
+      start = #label - rightChar.mWidth,
+      stop = -1
+    }
+    }
+  )
+end
+
+
+function Tab:createLeftwardTab()
+  local leftChar  = SpecialChar:new("█")
+  local rightChar = SpecialChar:Padding(2)
+
+  local label = createTabLabel(leftChar, self.label, rightChar, self.config.width)
+
+  log("origLeft: \"" .. label .. "\"")
+
+  self.winid = api.nvim_open_win(self.bufnr, false, self.config)
+  api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { label })
+  CreateTabHighlights(
+    self.bufnr,
+    {{
+      group = "NTTabRnd",
+      start = 0,
+      stop  = leftChar.mWidth,
+    },{
+      group = "NTTabLine",
+      start = leftChar.mWidth + #string.format("%d", self.idx) + 2,
+      stop  = -1,
+    },{
+      group = "NTTabSep",
+      start = leftChar.mWidth,
+      stop  = leftChar.mWidth + #string.format("%d", self.idx) + 2
+    }}
+  )
+end
+
+function Tab:createCenterTab()
+  local leftChar  = SpecialChar:new("| ")
+  local rightChar = SpecialChar:Padding(2)
+
+  local label = createTabLabel(leftChar, self.label, rightChar, self.config.width)
+
+  self.winid = api.nvim_open_win(self.bufnr, false, self.config)
+  api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { label })
+  CreateTabHighlights(
+    self.bufnr,
+    {{
+      group = "NTTabLine",
+      start = 0, stop = -1
+    },
+    {
+      group = "NTTabSep",
+      start = 0,
+      stop = leftChar.mWidth,
+    },{
+      group = "NTTabSep",
+      start = leftChar.mWidth,
+      stop = leftChar.mWidth + #string.format(" %d", self.idx)+2
+    }}
+  )
+end
+
+function Tab:createRightWardTab()
+  local leftChar  = SpecialChar:new("| ")
+  local rightChar = SpecialChar:new("█")
+  local label = createTabLabel(leftChar, self.label, rightChar, self.config.width)
+
+  log("origRigh: \"" .. label .. "\"")
+
+  self.winid = api.nvim_open_win(self.bufnr, false, self.config)
+  api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { label })
+  CreateTabHighlights(
+    self.bufnr,
+    {{
+      group = "NTTabLine",
+      start = 0, stop = -1,
+    },{
+      group = "NTTabRnd",
+      start = #label-rightChar.mWidth,
+      stop = -1
+    },{
+      group = "NTTabSep",
+      start = 0,
+      stop = leftChar.mWidth + #string.format(" %d", self.idx)+2
+    }}
+  )
+end
+
+---@param from number
+---@param to   number
+function Tab:hlAccent(from, to)
+  api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabSep", 0, from, to)
+end
+
+
 function Tab:Display()
-  log("Name: \"" .. self.label .. "\"")
   self.config.focusable = true
-  local rawName = self.label
-  local tabWidth = self.config.width
-
-  local function ellipsis(label, cutoff)
-    return string.format("%s... ", string.sub(label, 0, cutoff))
-  end
-
-  ---@param from number
-  ---@param to   number
-  local function hlAccent(from, to)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabSep", 0, from, to)
-  end
-
   api.nvim_buf_clear_namespace(self.bufnr, 0, 0, -1)
+
   if self.group == "NTTabLineSel" then -- Focus
-    local left, right  = rndLeft.length, rndRight.length
-    local innerWidth = tabWidth - left - right
-    if #rawName >= innerWidth then
-      rawName = ellipsis(rawName, innerWidth-#rawName-#"... ")
-    end
-    local padding = string.rep(" ", innerWidth - #rawName + 2)
-    rawName = string.format("%s%s%s%s", rndLeft.ch, rawName, padding, rndRight.ch)
-
-    self.winid = api.nvim_open_win(self.bufnr, false, self.config)
-    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { rawName })
-
-    log(" Focus: \"".. rawName .. "\"")
-
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabLineSel", 0, 0, -1)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabRndSel", 0, 0, #rndLeft.ch)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabRndSel", 0, #rawName-#rndRight.ch, -1)
-
+    self:createFocusedTab()
   elseif self.idx == 1 then -- Left
-    local left, right  = rndLeft.length, rndRight.length
-    local innerWidth = tabWidth - left
-    if #rawName >= innerWidth then
-      rawName = ellipsis(rawName, innerWidth-#rawName-#"... ")
-    end
-    local padding = string.rep(" ", innerWidth - #rawName + right + 2)
-    rawName = string.format("%s%s%s", rndLeft.ch, rawName, padding)
-    self.winid = api.nvim_open_win(self.bufnr, false, self.config)
-    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { rawName })
-
-    log("  Left: \"".. rawName .. "\"")
-
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabRnd", 0, 0, #rndLeft.ch)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabRnd", 0, 0, #rndLeft.ch)
-
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabLine", 0, #rndLeft.ch, -1)
-
-    hlAccent(#rndLeft.ch, #rndLeft.ch + #string.format("%d", self.idx) + 2)
-
+    self:createLeftwardTab()
   elseif self.idx < self.totalTabs then -- Center
-    local left = sepCent.length
-    local right = sepRight.length
-    local innerWidth = tabWidth - left - right
-    if #rawName >= innerWidth then
-      rawName = ellipsis(rawName, innerWidth-#rawName-#"... ")
-    end
-    local padding = string.rep(" ", innerWidth - #rawName + right)
-    rawName = string.format("%s %s%s%s", sepCent.ch, rawName, padding, sepCent.ch)
-
-    self.winid = api.nvim_open_win(self.bufnr, false, self.config)
-    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { rawName })
-
-    log("Center: \"".. rawName .. "\"")
-
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabLine", 0, 0, -1)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabSep", 0, 0, #sepCent.ch)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabSep", 0, #rawName-#sepCent.ch, -1)
-
-    hlAccent(#sepCent.ch, #sepCent.ch + #string.format(" %d", self.idx) + 2)
-
+    self:createCenterTab()
   elseif self.idx == self.totalTabs then -- Right
-    local left, right  = rndLeft.length, rndRight.length
-    local innerWidth = tabWidth - left
-    if #rawName >= innerWidth then
-      rawName = ellipsis(rawName, innerWidth-#rawName-#"... ")
-    end
-
-    local left_pad = string.rep(" ", rndLeft.length)
-    local right_pad  = string.rep(" ", innerWidth - #rawName + right - rndRight.length)
-    log("lPad: " .. #left_pad)
-    log("rPad: " .. #right_pad)
-    rawName = string.format("%s%s%s%s", left_pad, rawName, right_pad, rndRight.ch)
-
-    self.winid = api.nvim_open_win(self.bufnr, false, self.config)
-    api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { rawName })
-
-    log("  Left: \"".. rawName .. "\"")
-
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabLine", 0, 0, -1)
-    api.nvim_buf_add_highlight(self.bufnr, 0, "NTTabRnd", 0, #rawName-#rndRight.ch, -1)
-
-    hlAccent(rndLeft.length, rndLeft.length + #string.format("%d", self.idx) + 1)
+    self:createRightWardTab()
   end
 
   return self
 end
 
--- Formats self.name into the Displayed name in the Tab.
--- If the chosen name does not fit wihtin the constrains 
--- set forth by tab.config.width.
--- If self.name is too long, we splice and add an elipsis
--- before adding it to the UI
-----@param idx number
-----@param total_tabs number
--- function Tab:XCompileName(idx, total_tabs)
---   local width = self.config.width
---   local left, right = self.ends.left, self.ends.right
---   local tabName = string.format("%d ▎%s", self.idx, self.name)
---   local padding = width - #tabName - 4
---   if padding >= 9 then
---     tabName = string.format("%s%s", tabName, string.rep(" ", padding))
---   else
---     tabName = string.format("%s...  ",string.sub(tabName, 0, width-9))
---   end
---   -- return tabName
---   -- string.format("%s %s %s ", left, tabName, right)
---   log("IDX: " .. idx .. " TotalTabs: " .. total_tabs)
---   local name = ""
---
---   log("Left: " .. #self.ends.left)
---   log("Righ: " .. #self.ends.right)
---
---   if total_tabs == 1 then
---     name = string.format("%s %s %s ", left, tabName, right)
---   elseif idx > 1 and idx < total_tabs then
---     name = string.format("   $s   ", tabName)
---   elseif idx == total_tabs then
---     name = string.format("   $s $s", tabName, left)
---   end
---   log("TabName[ "..#name.." ]: \""..name.. "\"")
---
---   return name
--- end
-
-
--- ---@param total_tabs number
--- function Tab:CompileName(total_tabs)
---   local tabWidth = self.config.width
---   local left, right = self.ends.left, self.ends.right
---   local sepPadding = #'▎'-1
---   local rawName = string.format("%d ▎%s", self.idx, self.name)
---
---   log("self.idx: " .. self.idx)
---
---   -- focused
---   if self.group == "NTTabLineSel" then
---     local difference = tabWidth - #rawName+sepPadding - self.ends.lPad - self.ends.rPad
---     self.config.zindex = self.config.zindex+1
---     -- return string.format("%s%s%s%s", left, rawName, string.rep(" ", difference), right)
---     return {
---       lPad  = ends.lPad,
---       label = string.format("%s%s%s%s", left, rawName, string.rep(" ", difference), right),
---       rPad  = ends.rPad,
---     }
---   end
---
---   -- first unforcused
---   if self.idx == 1 then
---     local difference = tabWidth - #rawName+sepPadding - self.ends.lPad + self.ends.rPad + self.ends.lPad
---     self.config.width = self.config.width+3
---     -- return string.format("%s%s%s", left, rawName, string.rep(" ", difference))
---     return {
---       lPad  = ends.lPad,
---       label = string.format("%s%s%s", left, rawName, string.rep(" ", difference)),
---       rPad  = -1
---     }
---   end
---
---   -- center unforcused
---   if self.idx < total_tabs then
---   local difference = tabWidth - #rawName+sepPadding + self.ends.lPad + self.ends.rPad
---   return string.format("%s%s%s", string.rep(" ", self.ends.lPad), rawName, string.rep(" ", difference))
---   end
---
---   -- last
---   local difference = tabWidth - #rawName+sepPadding - self.ends.lPad
---   return string.format("%s%s%s", rawName, string.rep(" ", difference), right)
-
-  -- local difference = tabWidth - #rawName+sepPadding - self.ends.lPad - self.ends.rPad
-  -- return string.format("%s%s%s%s", left, rawName, string.rep(" ", difference), right)
--- end
-
--- ---@param onClick    function
--- ---@param group      string
--- ---@param total_tabs number
--- function Tab:xDisplay(onClick, group, total_tabs)
---   if not api.nvim_buf_is_valid(self.bufnr) then
---     log("self.bufnr not a valid bufnr: "..self.bufnr)
---   end
---
---   self.group = group
---   self.tabName = self:CompileName(total_tabs)
---
---   self.winid = api.nvim_open_win(self.bufnr, false, self.config)
---   api.nvim_buf_set_lines(self.bufnr, 0, -1, false, { self.name })
---
---   -- RightMouse kepmapping NOT WORKING
---   api.nvim_buf_set_keymap(self.bufnr, 'n', '<RightMouse>', '', {
---     callback = function()
---       log("Clicked on \"" .. self.name .. "\"")
---       onClick()
---     end,
---     noremap = true,
---     silent  = true,
---   })
---
---   api.nvim_buf_clear_namespace(self.bufnr, 0, 0, -1)
--- end
-
--- function Tab:Highlight()
---   api.nvim_buf_clear_namespace(self.bufnr, 0, 0, -1)
---   local border = ""
---   local group = self.group
---   if group == "NTTabLineSel" then
---     border = "NTTabLine"
---   else
---     border = "NTTabLineSel"
---   end
---   local ends = self.ends
---   local endLen = #ends.left
---   local namelength = #self.tabName - #ends.left
---   api.nvim_buf_add_highlight(self.bufnr, 0, group,  0, 0, -1)
---   api.nvim_buf_add_highlight(self.bufnr, 0, border, 0, 0, endLen) -- left
---   api.nvim_buf_add_highlight(self.bufnr, 0, border, 0, namelength, -1) -- right
--- end
-
 function Tab:Hide()
-  log("HIDE TAB")
   api.nvim_win_hide(self.winid)
   self.winid = nil
 end

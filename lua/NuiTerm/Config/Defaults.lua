@@ -29,7 +29,7 @@ Defaults.tabBarConfig = function(row, col)
     col       = col,
     style     = "minimal",
     border    = "none",
-    focusable = false,
+    focusable = true,
   }
 end
 
