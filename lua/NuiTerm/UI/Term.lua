@@ -17,14 +17,15 @@ local TermWindow = {  }
 ---@param config table
 function TermWindow:Init(termid, config)
   local obj = setmetatable({
-    bufnr       = nil,
-    winid       = nil,
-    termid      = nil,
-    name        = "NuiTerm",
-    config      = {},
-    onHide      = nil,
-    showing     = false,
-    spawned     = false,
+    bufnr        = nil,
+    winid        = nil,
+    termid       = nil,
+    name         = "NuiTerm",
+    curLineCount = 0,
+    config       = {},
+    onHide       = nil,
+    showing      = false,
+    spawned      = false,
   }, { __index = self })
   obj.termid = termid
   obj.config = config
@@ -84,7 +85,23 @@ function TermWindow:Show()
   self:SpawnShell()
   self.showing = true;
   Keymaps.AddTermKeyMaps(self.bufnr)
+
   return winid
+end
+
+--- If the current Buffer line count is greate than the NuiTerm window height,
+--- then we move the cursor to the last line of the buffer.
+function TermWindow:MoveToLastLine()
+  local line_count = api.nvim_buf_line_count(self.bufnr)
+  for i = line_count, 1, -1 do
+    local line = api.nvim_buf_get_lines(self.bufnr, i-1, i, false)[1]
+    if line and line:match("%s") then
+      return i
+    end
+  end
+
+  api.nvim_win_set_cursor(self.winid, {line_count, 0})
+  print("LastLine: " .. line_count)
 end
 
 function TermWindow:Hide()

@@ -12,6 +12,15 @@ local log = Debug.LOG_FN("MainWindow", {
   deactivate = false,
 })
 
+---@enum nuiterm.NuiState
+local NuiState = {
+  Initializing = 0,
+  NormalMode   = 1,
+  TerminalMode = 2,
+  Renaming     = 3,
+  Resizing     = 4,
+}
+
 ---@class MainWindow
 local MainWindow = { }
 
@@ -34,7 +43,9 @@ function MainWindow:new(dispatcher, winConfig, shellConfig)
     shellConfig   = shellConfig,
     resizeCmdID   = nil,
     stateChanging = false,
-    termWindows   = {}
+    termWindows   = {},
+    previousState = nil,
+    currentState  = NuiState.Initializing,
   }, { __index = self })
   return obj
 end
@@ -125,9 +136,16 @@ function MainWindow:ShowTerminal(id)
     blend = 90,
     fg = "#FFFFF0"
   })
-  api.nvim_win_set_cursor(winid, { 4, 4 })
+  self.previousState = self.currentState
+  self.currentState = NuiState.TerminalMode
+  local currentTerminal = self.termWindows[self.currentTermID]
+  if currentTerminal then
+    currentTerminal:MoveToLastLine()
+  end
   self:PushIds()
   self.curTermWinid = winid
+
+  self:TermMode();
 end
 
 function MainWindow:Show()
@@ -142,7 +160,6 @@ function MainWindow:Show()
     blend = 100,
     fg = "#001011"
   })
-
 
   self.mainWinBufnr = mainWinBufnr
   self.mainWinid    = mainWinid
@@ -290,6 +307,8 @@ end
 ---                  ---
 ---@param arg number|string
 function MainWindow:Resize(arg)
+  self.previousState = self.currentState
+  self.currentState  = NuiState.Resizing
   self.stateChanging = true
   local num = tonumber(arg)
   if not num then return end
@@ -302,11 +321,16 @@ function MainWindow:Resize(arg)
   self:Hide()
   self:Show()
   self.stateChanging = false
+  local state        = self.currentState
+  self.currentState  = self.previousState
+  self.previousState = state
 end
 
 ---@param args table
 function MainWindow:OnTermResize(args)
   vim.defer_fn(function()
+    self.previousState = self.currentState
+    self.currentState  = NuiState.Resizing
     self:NormMode()
     self:Hide()
     local width = args.width
@@ -318,11 +342,16 @@ function MainWindow:OnTermResize(args)
       term:UpdateConfig(self.winConfig)
     end
     self:Show()
+    local state        = self.currentState
+    self.currentState  = self.previousState
+    self.previousState = state
   end, 400)
 end
 
 function MainWindow:RenameStart()
   log("Starting Rename Proceedure", "RenameStart")
+  self.previousState = self.currentState
+  self.currentState  = NuiState.Resizing
   if not self.showing then
     print("NuiTerm is not active")
     return
@@ -346,6 +375,9 @@ function MainWindow:RenameFinish(newName)
   Keymaps.AddTermKeyMaps(self.termWindows[self.currentTermID].bufnr)
   self:UpdateTabBar()
   self:NormMode()
+  local state        = self.currentState
+  self.currentState  = self.previousState
+  self.previousState = state
 end
 
 return MainWindow

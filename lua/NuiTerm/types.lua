@@ -65,6 +65,8 @@
 ---@field winConfig     table
 ---@field shellConfig   table
 ---@field resizeCmdID   number|nil
+---@field previousState nuiterm.NuiState
+---@field currentState  nuiterm.NuiState
 ----@field New               fun(dispatcher: NTEventDispatcher, winConfig: table): MainWindow
 ---@field PushSubscriptions fun(self: MainWindow): nil
 ---@field PushIds           fun(self: MainWindow): nil
@@ -90,16 +92,17 @@
 ---@field RenameEnd         fun(self: MainWindow, newName: string): nil
 
 ---@class TermWindow
----@field bufnr       number|nil
----@field winid       number|nil
----@field termid      number|nil
----@field name        string
----@field autocmdid   number|nil
----@field config      table
----@field onHide      function|nil
----@field showing     boolean
----@field spawned     boolean
----@field initialized boolean
+---@field bufnr         number|nil
+---@field winid         number|nil
+---@field termid        number|nil
+---@field name          string
+---@field curLineCount  number
+---@field autocmdid     number|nil
+---@field config        table
+---@field onHide        function|nil
+---@field showing       boolean
+---@field spawned       boolean
+---@field initialized   boolean
 ----@field Init         fun(termid: number, config: table): TermWindow
 ---@field IsBufValid   fun(self: TermWindow): boolean
 ---@field OnHoverOver  fun(self: TermWindow, curent: number): nil

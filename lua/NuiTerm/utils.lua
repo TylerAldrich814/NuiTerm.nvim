@@ -1,10 +1,23 @@
 --> NuiTerm/utils.lua
 --
-
 local M = {}
 local log = require("NuiTerm.Debug").LOG_FN("config", {
   deactivated = false
 })
+
+---@param frac string
+---@return {num: number, den: number }
+M.parse_fraction = function(frac)
+  local num, den = string.match(frac, "^(%d+)/(%d+)$")
+  num = tonumber(num) den = tonumber(den)
+  if not num then
+    error("Failed to parse a valid numerator", 2)
+  end
+  if not den then
+    error("Failed to parse a valid denominator", 2)
+  end
+  return {num = num, den = den}
+end
 
 ---@alias close_win_if_valid fun(winid: number, force: boolean): unknown
 
@@ -114,13 +127,13 @@ M.WidthPCT = function (width)
   end
 
   if type(width) == "string" then
-    local num, den = string.match(width, "^(%d+)/(%d+)$")
+    local frac = M.parse_fraction(width)
+    local num, den = frac.num, frac.den
     if not num or not den then
       -- return termWidth, winCol, tabCol
       return termWidth, 0, 0
     end
 
-    num, den = tonumber(num), tonumber(den)
     if num > den then
       return termWidth, 0, 0
     end

@@ -5,7 +5,6 @@ local NTEventController = require("NuiTerm.Events.EventController")
 local M = {}
 
 M.setup = function(opts)
-  print("SETUP")
   local eventController = NTEventController:new(opts)
   eventController:PushSubscriptions()
   eventController:GlobalAutoCmds()

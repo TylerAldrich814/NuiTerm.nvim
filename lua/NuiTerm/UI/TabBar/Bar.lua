@@ -15,11 +15,11 @@ local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
 -------------------------------------------------------
 --TODO: Figure out how to gracfully close the TabBar when you quit NuiTerm via ':q'&':q!'..
 
+
 ---@class TabBar
 local TabBar = { }
 ---@param dispatcher NTEventDispatcher
 ---@param barConfig  table
----@param tabConfig  table
 function TabBar:new(dispatcher, barConfig, tabConfig)
   if not barConfig then
     error("BarConfig is nil", 2)
@@ -99,20 +99,6 @@ function TabBar:SetTabs(args)
     col = col + width
   end
   log(" -------")
-
-  -- for i, tab in ipairs(self.tabs) do
-  --   local group = "TabLine"
-  --   if i == currentTermID then group = "TabLineSel" end
-    -- tab:Display(self.onClick, group, total_tabs)
-  --   tab:Display()
-  -- end
-
-  -- for i, tab in ipairs(self.tabs) do
-  --   local group = "TabLine"
-  --   if i == currentTermID then group = "TabLineSel" end
-  --   tab:Highlight(group)
-  -- end
-
   vim.api.nvim_buf_set_keymap(
     self.bufnr,
     'n',

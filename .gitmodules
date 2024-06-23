@@ -1,0 +1,3 @@
+[submodule "lua/NuiTerm/lib/outcome"]
+	path = lua/NuiTerm/lib/outcome
+	url = https://github.com/mtdowling/outcome.git
