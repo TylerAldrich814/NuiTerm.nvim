@@ -15,14 +15,14 @@ local DebugConfig = {
   row = 0,
   col = vim.o.columns - 103,
   border = "rounded",
-  focusable = false,
+  focusable = not false,
 };
 
 local M = {}
 
 M.FirstInit = true;
 M.Messages = {}
-M.StayClosed = true;
+M.StayClosed = not true;
 
 vim.keymap.set('n', '<leader>td', function() M.ToggleDebug() end, { noremap = true, silent = true})
 

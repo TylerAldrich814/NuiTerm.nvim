@@ -145,7 +145,7 @@ function MainWindow:ShowTerminal(id)
   self:PushIds()
   self.curTermWinid = winid
 
-  self:TermMode();
+  self:TermMode()
 end
 
 function MainWindow:Show()

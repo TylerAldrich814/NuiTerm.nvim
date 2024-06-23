@@ -6,7 +6,7 @@ local Keymaps = require("NuiTerm.Keymap.Term")
 local api, fn     = vim.api, vim.fn
 
 local log = Debug.LOG_FN("TermWindow", {
-  deactivate = true,
+  deactivate = false,
 })
 
 ---@class TermWindow
@@ -89,19 +89,27 @@ function TermWindow:Show()
   return winid
 end
 
---- If the current Buffer line count is greate than the NuiTerm window height,
---- then we move the cursor to the last line of the buffer.
-function TermWindow:MoveToLastLine()
-  local line_count = api.nvim_buf_line_count(self.bufnr)
+---@param bufnr    number
+---@param fallback number
+local function getLastNonEmptyLine(bufnr, fallback)
+  local line_count = api.nvim_buf_line_count(bufnr)
   for i = line_count, 1, -1 do
-    local line = api.nvim_buf_get_lines(self.bufnr, i-1, i, false)[1]
+    local line = api.nvim_buf_get_lines(bufnr, i-1, i, false)[1]
     if line and line:match("%s") then
       return i
     end
   end
+  return fallback
+end
 
-  api.nvim_win_set_cursor(self.winid, {line_count, 0})
-  print("LastLine: " .. line_count)
+--- If the current Buffer line count is greate than the NuiTerm window height,
+--- then we move the cursor to the last line of the buffer.
+function TermWindow:MoveToLastLine()
+  api.nvim_win_set_cursor(
+    self.winid, {
+      getLastNonEmptyLine(self.bufnr,4), 4
+    }
+  )
 end
 
 function TermWindow:Hide()

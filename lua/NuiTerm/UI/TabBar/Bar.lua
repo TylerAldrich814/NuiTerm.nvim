@@ -7,7 +7,7 @@ local AUGROUP = api.nvim_create_augroup("NuiTermTabHover", { clear=true })
 local NuiTermRename = require("NuiTerm.UI.Rename")
 
 local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
-  deactivate = false,
+  deactivate = true,
 })
 
 
