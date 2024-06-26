@@ -33,7 +33,7 @@ function TermWindow:Init(termid, config)
 
   vim.bo[bufnr].bufhidden  = "hide"
   vim.bo[bufnr].buftype    = "acwrite"
-  vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modifiable = true
 
   obj.bufnr       = bufnr
   obj.initialized = true

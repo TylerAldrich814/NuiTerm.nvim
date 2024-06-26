@@ -1,3 +1,6 @@
 [submodule "lua/NuiTerm/lib/outcome"]
 	path = lua/NuiTerm/lib/outcome
 	url = https://github.com/mtdowling/outcome.git
+[submodule "lua/NuiTerm/vendor/sqlite.lua"]
+	path = lua/NuiTerm/vendor/sqlite.lua
+	url = https://github.com/kkharji/sqlite.lua

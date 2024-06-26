@@ -5,7 +5,6 @@ local Tab   = require("NuiTerm.UI.TabBar.Tab")
 local fn, api, map = vim.fn, vim.api, vim.keymap.set
 local AUGROUP = api.nvim_create_augroup("NuiTermTabHover", { clear=true })
 local NuiTermRename = require("NuiTerm.UI.Rename")
-
 local log = require("NuiTerm.Debug").LOG_FN("TabBar", {
   deactivate = true,
 })

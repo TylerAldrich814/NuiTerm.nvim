@@ -2,6 +2,13 @@
 --
 local Defaults = {}
 
+Defaults.MainWindowPadding = {
+  top    = 3,
+  bottom = 2,
+  left   = 4,
+  right  = 4,
+}
+
 Defaults.winConfig = function()
   return {
     width    = vim.o.columns,
@@ -9,12 +16,6 @@ Defaults.winConfig = function()
     position = "bottom",
     style    = "minimal",
     border   = "rounded",
-    padding  = {
-      top    = 3,
-      bottom = 2,
-      left   = 4,
-      right  = 4,
-    }
   }
 end
 
@@ -23,7 +24,7 @@ end
 Defaults.tabBarConfig = function(row, col)
   return {
     relative  = "win",
-    width     = 2, -- no border padding
+    width     = 2,
     height    = 1,
     row       = row,
     col       = col,

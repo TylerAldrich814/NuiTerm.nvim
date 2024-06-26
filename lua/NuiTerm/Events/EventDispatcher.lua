@@ -37,6 +37,11 @@ local EVENTS = {
   update_current_bufnr = 17,
   get_current_winid    = 18,
   get_current_bufnr    = 19,
+
+
+  db_initialize    = 20,
+  db_configuration = 21,
+  db_showInstances = 22,
 }
 ---@param value number
 local function db_event_str(value)

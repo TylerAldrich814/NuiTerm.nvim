@@ -6,7 +6,8 @@ local Keymaps = require("NuiTerm.Keymap.Term")
 local Utils = require("NuiTerm.utils")
 local TermWindow = require("NuiTerm.UI.Term")
 local Debug = require("NuiTerm.Debug")
-local api = vim.api
+
+local api, fn = vim.api, vim.fn
 
 local log = Debug.LOG_FN("MainWindow", {
   deactivate = false,
@@ -89,6 +90,19 @@ function MainWindow:PushSubscriptions()
   end)
 end
 
+---@param stateChangeCbs {state: nuiterm.NuiState, cb: fun()}
+function MainWindow:onStateChange(stateChangeCbs)
+  local curState = self.currentState
+  for k, v in pairs(NuiState) do
+    if v == curState then
+      log("CurrentState: " .. k)
+    end
+  end
+  local stateCallback = stateChangeCbs[curState]
+  if not stateCallback and type(stateCallback) ~= "function" then return end
+  stateChangeCbs[curState]()
+end
+
 function MainWindow:PushIds()
   self.dispatcher:emit(
     EVENTS.update_current_winid,
@@ -114,12 +128,14 @@ function MainWindow:NewTerm()
     self.termWindows[self.currentTermID]:Hide()
   end
   local newTerm = self:CreateNewTerm()
-  self:ShowTerminal(newTerm)
+  self:ShowTerminal(newTerm, NuiState.NormalMode)
   self:PushIds()
   self:UpdateTabBar()
 end
 
-function MainWindow:ShowTerminal(id)
+---@param id number
+---@param mode nuiterm.NuiState
+function MainWindow:ShowTerminal(id, mode)
   local term = self.termWindows[id]
 
   if not term then
@@ -137,7 +153,6 @@ function MainWindow:ShowTerminal(id)
     fg = "#FFFFF0"
   })
   self.previousState = self.currentState
-  self.currentState = NuiState.TerminalMode
   local currentTerminal = self.termWindows[self.currentTermID]
   if currentTerminal then
     currentTerminal:MoveToLastLine()
@@ -145,7 +160,13 @@ function MainWindow:ShowTerminal(id)
   self:PushIds()
   self.curTermWinid = winid
 
-  self:TermMode()
+  -- self:onStateChange({
+  --   [NuiState.Initializing] = function() log("Initializing") self:TermMode() end,
+  --   [NuiState.TerminalMode] = function() log("TerminalMode") self:NormMode() end,
+  --   [NuiState.NormalMode]   = function() log("NormalMode") self:NormMode() end
+  -- })
+  self:TermMode();
+  self.currentState = NuiState.TerminalMode
 end
 
 function MainWindow:Show()
@@ -163,7 +184,7 @@ function MainWindow:Show()
 
   self.mainWinBufnr = mainWinBufnr
   self.mainWinid    = mainWinid
-  self:ShowTerminal(self.currentTermID)
+  self:ShowTerminal(self.currentTermID, NuiState.TerminalMode)
   self:UpdateTabBar()
   self.showing = true
 end
@@ -236,7 +257,7 @@ function MainWindow:ToTerm(term_id)
   self.termWindows[self.currentTermID]:Hide()
   self.currentTermID = term_id
   self:PushIds()
-  self:ShowTerminal(term_id)
+  self:ShowTerminal(term_id, NuiState.NormalMode)
   self:UpdateTabBar()
 end
 
@@ -246,7 +267,7 @@ function MainWindow:NextTerm()
   end
   self.currentTermID = (self.currentTermID % self.totalTerms) + 1
   self:PushIds()
-  self:ShowTerminal(self.currentTermID)
+  self:ShowTerminal(self.currentTermID, NuiState.NormalMode)
   self:UpdateTabBar()
 end
 
@@ -256,7 +277,7 @@ function MainWindow:PrevTerm()
   end
   self.currentTermID = (self.currentTermID - 2 + self.totalTerms) % self.totalTerms + 1
   self:PushIds()
-  self:ShowTerminal(self.currentTermID)
+  self:ShowTerminal(self.currentTermID, NuiState.NormalMode)
   self:UpdateTabBar()
 end
 
@@ -274,12 +295,16 @@ function MainWindow:TermMode()
 end
 
 function MainWindow:NormMode()
-  api.nvim_win_set_hl_ns(self.curTermWinid, self.termNsid)
-  api.nvim_set_hl(self.termNsid, "FloatBorder", {
-    blend = 00,
-    fg = "#FFFFF0",
-  })
-  api.nvim_feedkeys(api.nvim_replace_termcodes("<C-\\><C-n>", true, true, true), 'n', true)
+  if api.nvim_win_is_valid(self.curTermWinid)then
+    api.nvim_win_set_hl_ns(self.curTermWinid, self.termNsid)
+    api.nvim_set_hl(self.termNsid, "FloatBorder", {
+      blend = 00,
+      fg = "#FFFFF0",
+    })
+    api.nvim_feedkeys(api.nvim_replace_termcodes("<C-\\><C-n>", true, true, true), 'n', true)
+
+    self.currentState = NuiState.NormalMode
+  end
 end
 
 function MainWindow:GetTermNames()
@@ -349,7 +374,6 @@ function MainWindow:OnTermResize(args)
 end
 
 function MainWindow:RenameStart()
-  log("Starting Rename Proceedure", "RenameStart")
   self.previousState = self.currentState
   self.currentState  = NuiState.Resizing
   if not self.showing then
@@ -367,7 +391,6 @@ function MainWindow:RenameStart()
 end
 
 function MainWindow:RenameFinish(newName)
-  log("Ending Rename Proceedure", "RenameStart")
   if not newName then
     error("args is nil", 1)
   end
